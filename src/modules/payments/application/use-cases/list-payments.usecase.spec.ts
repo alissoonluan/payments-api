@@ -70,4 +70,22 @@ describe('ListPaymentsUseCase', () => {
 
     expect(result).toEqual([]);
   });
+
+  it('should filter payments by both cpf and paymentMethod', async () => {
+    const query: ListPaymentsQueryDto = {
+      cpf: '11144477735',
+      paymentMethod: PaymentMethod.PIX,
+    };
+    repository.list.mockResolvedValue([mockPayment]);
+
+    const result = await useCase.execute(query);
+
+    expect(repository.list).toHaveBeenCalledWith({
+      cpf: '11144477735',
+      paymentMethod: PaymentMethod.PIX,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].payerCpf).toBe('11144477735');
+    expect(result[0].paymentMethod).toBe(PaymentMethod.PIX);
+  });
 });

@@ -144,50 +144,7 @@ describe('PaymentsController (e2e)', () => {
       .expect(422);
   });
 
-  it('POST /api/mercadopago/webhook should update payment status', async () => {
-    // 1. Create a payment that has an external reference (simulating CC or PIX w/ integration)
-    // For this test, we can manually create one via POST and assert expecting it has an ID,
-    // BUT the webhook logic relies on `gateway.getPaymentById` returning the external reference
-    // containing the payment ID (or some logic to link them).
-    //
-    // The `ProcessMercadoPagoWebhookUseCase` calls `gateway.getPaymentById(mpPaymentId)`.
-    // The gateway returns `{ externalReference, status }`.
-    // Then repo finds by externalReference.
-    //
-    // Our fake gateway returns 'ext-ref-approved' for 'mp-approved'.
-    // So we need to ensure a payment exists in DB with `mpExternalReference = 'ext-ref-approved'`.
-
-    // We can't directly inject into Repo easily in E2E without avoiding the controller.
-    // So we create a payment normally, but we can't easily set `mpExternalReference` via API (it's internal).
-    //
-    // However, `CreatePaymentUseCase` for CREDIT_CARD sets `mpExternalReference` to `uuid()`.
-    // We don't know that UUID.
-    //
-    // Strategy:
-    // 1. Use `createPayment` (Credit Card). It generates an external reference.
-    // 2. We can't force the external reference to be 'ext-ref-approved' unless we mock the UUID generator or the Gateway returns it.
-    //    Actually, `CreatePaymentUseCase` sets `mpExternalReference` BEFORE calling gateway?
-    //    Let's check `CreatePaymentUseCase`.
-
-    // Checked UseCase:
-    // const mpExternalReference = uuidv4();
-    // await this.paymentGateway.createPreference(...)
-
-    // The only way to match them is if `FakePaymentGateway.getPaymentById` returns the SAME external reference
-    // that was stored in the DB. But `getPaymentById` takes `mpPaymentId` as input (from webhook).
-    // The real gateway would look up the payment on MP and return the `external_reference` we sent it.
-
-    // Valid Testing Strategy with Fakes:
-    // Since we cannot easily know the UUID generated inside the use-case (unless we query the DB or the API returns it).
-    // The API DOES return `mpExternalReference` in `PaymentResponseDto` (if we allowed it).
-    // Let's check `PaymentResponseDto`. Yes, it has `@ApiPropertyOptional() mpExternalReference`.
-
-    // So:
-    // 1. Create Payment (CC).
-    // 2. Get `mid` (mpExternalReference) from response.
-    // 3. Configure `FakeGateway` to return THIS `mid` when queried with a specific `mpPaymentId`.
-    //    We need `Reflect` or `jest.spy` on the `fakeGateway` instance we have reference to!
-
+  it('POST /api/mercadopago/webhook should update payment status to PAID', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/payment')
       .send({
@@ -202,27 +159,165 @@ describe('PaymentsController (e2e)', () => {
     const externalRef = payment.mpExternalReference;
     expect(externalRef).toBeDefined();
 
-    // Mock the gateway response for a specific ID 'webhook-1' to return this externalRef and 'approved'
-    // We can monkey-patch the fakeGateway instance since it's a singleton in the app module scope we created.
     fakeGateway.getPaymentById = jest.fn().mockResolvedValue({
       status: 'approved',
       externalReference: externalRef,
     });
 
-    // Send Webhook
     await request(app.getHttpServer())
       .post('/api/mercadopago/webhook')
       .send({
         type: 'payment',
         data: { id: 'webhook-1' },
       })
-      .expect(200); // Controller returns { ok: true } (200)
+      .expect(200);
 
-    // Check if status changed to PAID
     const getRes = await request(app.getHttpServer())
       .get(`/api/payment/${payment.id}`)
       .expect(200);
 
     expect(getRes.body.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('POST /api/mercadopago/webhook should update payment status to FAIL when rejected', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/payment')
+      .send({
+        amount: 250,
+        description: 'Webhook Reject Test',
+        payerCpf: validCpf,
+        paymentMethod: PaymentMethod.CREDIT_CARD,
+      })
+      .expect(201);
+
+    const payment = createRes.body;
+    const externalRef = payment.mpExternalReference;
+
+    fakeGateway.getPaymentById = jest.fn().mockResolvedValue({
+      status: 'rejected',
+      externalReference: externalRef,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/mercadopago/webhook')
+      .send({
+        type: 'payment',
+        data: { id: 'webhook-rejected' },
+      })
+      .expect(200);
+
+    const getRes = await request(app.getHttpServer())
+      .get(`/api/payment/${payment.id}`)
+      .expect(200);
+
+    expect(getRes.body.status).toBe(PaymentStatus.FAIL);
+  });
+
+  it('POST /api/mercadopago/webhook should be idempotent (duplicate webhook)', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/payment')
+      .send({
+        amount: 350,
+        description: 'Idempotency Test',
+        payerCpf: validCpf,
+        paymentMethod: PaymentMethod.CREDIT_CARD,
+      })
+      .expect(201);
+
+    const payment = createRes.body;
+    const externalRef = payment.mpExternalReference;
+
+    fakeGateway.getPaymentById = jest.fn().mockResolvedValue({
+      status: 'approved',
+      externalReference: externalRef,
+    });
+
+    // First webhook
+    await request(app.getHttpServer())
+      .post('/api/mercadopago/webhook')
+      .send({
+        type: 'payment',
+        data: { id: 'webhook-idempotent' },
+      })
+      .expect(200);
+
+    // Verify PAID
+    const firstCheck = await request(app.getHttpServer())
+      .get(`/api/payment/${payment.id}`)
+      .expect(200);
+    expect(firstCheck.body.status).toBe(PaymentStatus.PAID);
+
+    // Second webhook (duplicate) - should not change to FAIL
+    fakeGateway.getPaymentById = jest.fn().mockResolvedValue({
+      status: 'rejected', // Try to change to rejected
+      externalReference: externalRef,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/mercadopago/webhook')
+      .send({
+        type: 'payment',
+        data: { id: 'webhook-idempotent-2' },
+      })
+      .expect(200);
+
+    // Should still be PAID (idempotent)
+    const secondCheck = await request(app.getHttpServer())
+      .get(`/api/payment/${payment.id}`)
+      .expect(200);
+    expect(secondCheck.body.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('GET /api/payment/:id should return 404 for non-existent payment', async () => {
+    await request(app.getHttpServer())
+      .get('/api/payment/non-existent-id-12345')
+      .expect(404);
+  });
+
+  it('POST /api/payment should reject amount <= 0', async () => {
+    await request(app.getHttpServer())
+      .post('/api/payment')
+      .send({
+        amount: 0,
+        description: 'Zero amount',
+        payerCpf: validCpf,
+        paymentMethod: PaymentMethod.PIX,
+      })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/api/payment')
+      .send({
+        amount: -10,
+        description: 'Negative amount',
+        payerCpf: validCpf,
+        paymentMethod: PaymentMethod.PIX,
+      })
+      .expect(400);
+  });
+
+  it('GET /api/payment should filter by both cpf and paymentMethod', async () => {
+    // Create PIX payment
+    await request(app.getHttpServer())
+      .post('/api/payment')
+      .send({
+        amount: 100,
+        description: 'Filter Test PIX',
+        payerCpf: validCpf,
+        paymentMethod: PaymentMethod.PIX,
+      })
+      .expect(201);
+
+    // Query with both filters
+    const res = await request(app.getHttpServer())
+      .get('/api/payment')
+      .query({ cpf: validCpf, paymentMethod: PaymentMethod.PIX })
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    const found = res.body.find(
+      (p) => p.payerCpf === validCpf && p.paymentMethod === PaymentMethod.PIX,
+    );
+    expect(found).toBeDefined();
   });
 });

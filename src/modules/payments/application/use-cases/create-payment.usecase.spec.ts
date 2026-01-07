@@ -64,9 +64,23 @@ describe('CreatePaymentUseCase', () => {
     const result = await useCase.execute(dto);
 
     expect(result.paymentMethod).toBe(PaymentMethod.PIX);
-
     expect(gateway.createPreference).toHaveBeenCalledTimes(0);
     expect(repository.create).toHaveBeenCalled();
+  });
+
+  it('should throw exception when gateway fails', async () => {
+    (validateCPF as jest.Mock).mockReturnValue(true);
+
+    const dto = {
+      amount: 200,
+      description: 'Test Fail',
+      payerCpf: '11144477735',
+      paymentMethod: PaymentMethod.CREDIT_CARD,
+    };
+
+    gateway.createPreference.mockRejectedValue(new Error('Gateway error'));
+
+    await expect(useCase.execute(dto)).rejects.toThrow('Gateway error');
   });
 
   it('should create a CREDIT_CARD payment and call gateway', async () => {

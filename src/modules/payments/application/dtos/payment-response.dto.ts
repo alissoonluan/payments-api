@@ -3,40 +3,54 @@ import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { PaymentEntity } from '../../domain/payment.entity';
 
 export class PaymentResponseDto {
-  @ApiProperty()
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 100.5, description: 'Payment amount in BRL' })
   amount: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Dinner at Beach Restaurant' })
   description: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '11144477735', description: 'Payer CPF (11 digits)' })
   payerCpf: string;
 
-  @ApiProperty({ enum: PaymentMethod })
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.PIX })
   paymentMethod: PaymentMethod;
 
-  @ApiProperty({ enum: PaymentStatus })
+  @ApiProperty({ enum: PaymentStatus, example: PaymentStatus.PENDING })
   status: PaymentStatus;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440001',
+    description: 'Mercado Pago external reference (UUID)',
+  })
   mpExternalReference?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 'pref_123456789',
+    description: 'Mercado Pago preference ID',
+  })
   mpPreferenceId?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example:
+      'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_123',
+    description: 'Mercado Pago checkout URL (production)',
+  })
   mpInitPoint?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example:
+      'https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_123',
+    description: 'Mercado Pago checkout URL (sandbox)',
+  })
   mpSandboxInitPoint?: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2024-01-06T12:00:00Z' })
   createdAt: Date;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2024-01-06T12:30:00Z' })
   updatedAt: Date;
 
   static fromEntity(this: void, entity: PaymentEntity): PaymentResponseDto {

@@ -49,7 +49,7 @@ docker-compose up --build
 - **API:** `http://localhost:3000`
 - **Swagger Docs:** `http://localhost:3000/api/docs`
 - **Health Check:** `http://localhost:3000/health`
-- **Banco de Dados:** Porta `5433` (externa) mapping para `5432` (interna).
+- **Banco de Dados:** Porta `5432` (padrão PostgreSQL).
 
 ### 2. Rodando Localmente
 
@@ -141,8 +141,3 @@ O projeto inclui configuração de CI (GitHub Actions) que executa a cada push:
 - [x] Integração Mercado Pago modularizada.
 - [x] Tratamento de erros consistente.
 - [x] Documentação técnica (README) revisada.
-
-
-
-
-

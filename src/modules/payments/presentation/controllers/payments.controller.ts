@@ -20,12 +20,37 @@ export class PaymentsController {
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new payment' })
-  @ApiResponse({ status: 201, type: PaymentResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiOperation({
+    summary: 'Create a new payment',
+    description:
+      'Creates a new payment. For PIX, the payment is created directly. For CREDIT_CARD, integrates with Mercado Pago to generate a checkout preference.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment created successfully',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data (validation error)',
+    schema: {
+      example: {
+        message: ['amount must not be less than 0.01', 'Invalid CPF'],
+        error: 'Bad Request',
+        statusCode: 400,
+      },
+    },
+  })
   @ApiResponse({
     status: 422,
-    description: 'Business validation failed (e.g. invalid CPF)',
+    description: 'Business validation failed (e.g. invalid CPF checksum)',
+    schema: {
+      example: {
+        message: 'Invalid CPF',
+        error: 'Unprocessable Entity',
+        statusCode: 422,
+      },
+    },
   })
   async create(@Body() dto: CreatePaymentDto): Promise<PaymentResponseDto> {
     return this.createPaymentUseCase.execute(dto);
@@ -46,13 +71,27 @@ export class PaymentsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get payment by ID' })
   @ApiResponse({ status: 200, type: PaymentResponseDto })
-  @ApiResponse({ status: 404, description: 'Payment not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Payment not found',
+    schema: {
+      example: {
+        message: 'Payment with ID xyz not found',
+        error: 'Not Found',
+        statusCode: 404,
+      },
+    },
+  })
   async getById(@Param('id') id: string): Promise<PaymentResponseDto> {
     return this.getPaymentUseCase.execute(id);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List payments with filters' })
+  @ApiOperation({
+    summary: 'List payments with filters',
+    description:
+      'Returns a list of payments. Can be filtered by CPF and/or payment method.',
+  })
   @ApiResponse({ status: 200, type: [PaymentResponseDto] })
   async list(
     @Query() query: ListPaymentsQueryDto,
