@@ -61,7 +61,7 @@ export class PaymentsPrismaRepository implements PaymentsRepository {
 
   async list(filter: ListPaymentsFilter): Promise<PaymentEntity[]> {
     const where: Prisma.PaymentWhereInput = {};
-    if (filter.cpf) where.payerCpf = filter.cpf;
+    if (filter.payerCpf) where.payerCpf = filter.payerCpf;
     if (filter.paymentMethod) where.paymentMethod = filter.paymentMethod;
 
     const payments = await this.prisma.payment.findMany({

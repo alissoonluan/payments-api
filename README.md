@@ -1,143 +1,182 @@
-# Payments API 💳 - Teste Técnico
+# 💳 Payments API - Senior Technical Challenge
 
-Este repositório contém a implementação de uma API REST escalável para gerenciamento de pagamentos, desenvolvida como **Teste Técnico**.
-
-O objetivo principal deste projeto foi demonstrar proficiência em:
-
-- **Clean Architecture** e princípios **SOLID**.
-- **NestJS** com injeção de dependência avançada.
-- **Testes Automatizados** (Unitários e E2E) com estratégias de isolamento.
-- **Integração Externa** robusta e desacoplada (Mercado Pago).
-- **Dockerização** e prontidão para ambientes de produção.
-
-## 🚀 Tecnologias
-
-- **Framework:** [NestJS](https://nestjs.com/)
-- **Linguagem:** [TypeScript](https://www.typescriptlang.org/)
-- **ORM:** [Prisma](https://www.prisma.io/) (v7)
-- **Banco de Dados:** [PostgreSQL](https://www.postgresql.org/)
-- **Documentação:** [Swagger/OpenAPI](https://swagger.io/)
-- **Containerização:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
-- **Testes:** [Jest](https://jestjs.io/) & [SuperTest](https://github.com/visionmedia/supertest)
+Esta é uma solução de backend de alta performance para processamento de pagamentos, construída com **NestJS** e seguindo rigorosamente os princípios de **Clean Architecture**, **SOLID** e **Enterprise Patterns**.
 
 ---
 
-## 🏗️ Arquitetura
+## 🏗️ Diferenciais da Implementação (Senior Mindset)
 
-O projeto segue rigorosamente a **Clean Architecture**, dividindo responsabilidades em camadas concêntricas:
+Esta API foi desenvolvida focando em cenários reais de produção:
 
-1. **Domain**: Entidades puras, Enums e Value Objects. Sem dependências externas.
-2. **Application**: Casos de uso (Use Cases) e Portas (Interfaces de Gateway/Repository). A lógica de negócio reside aqui.
-3. **Infrastructure**: Implementação concreta das portas.
-   - `PrismaRepository`: Persistência.
-   - `MercadoPagoGateway`: Adaptador para o gateway de pagamento.
-   - `MercadoPagoClient`: Cliente HTTP encapsulado para chamadas externas.
-4. **Presentation**: Controladores REST e DTOs.
+- **Clean Architecture & Boundary Separation**: Desacoplamento total entre lógica de negócio (Domain/Application) e provedores externos (Prisma, Mercado Pago).
+- **Idempotência no Webhook**: O processamento de notificações do Mercado Pago garante consistência de dados mesmo em casos de retentativas automáticas do gateway.
+- **Validação de Dados Defensiva**:
+  - Implementação de algoritmos de _checksum_ para validadores customizados (CPF).
+  - Uso de `ClassValidator` com `Pipes` globais.
+- **Observabilidade Avançada (Terminus)**: Endpoint de `/health` completo que monitora Banco de Dados, Disco e Memória para garantir a saúde da infraestrutura.
+- **Estratégia de Testes Pragmática**:
+  - **Unitários**: Foco em Regras de Negócio, Casos de Uso e Lógica de Controladores (>90% coverage).
+  - **E2E**: Fluxo real com Banco de Dados isolado (Docker) e Mocks apenas em IO externo.
 
 ---
 
-## 🛠️ Como rodar o projeto
+## 🛠️ Stack Tecnológica
 
-### 1. Com Docker (Recomendado)
+- **Framework**: [NestJS](https://nestjs.com/) (v11+)
+- **ORM**: [Prisma](https://www.prisma.io/) com [PostgreSQL](https://www.postgresql.org/)
+- **Monitoramento**: [@nestjs/terminus](https://github.com/nestjs/terminus)
+- **Documentação**: [Swagger/OpenAPI](https://swagger.io/)
+- **Containerização**: [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
+- **Qualidade/Testes**: [Jest](https://jestjs.io/), [ESLint](https://eslint.org/), [Prettier](https://prettier.io/)
 
-A aplicação sobe "pronta para uso" com banco de dados configurado e variáveis de ambiente injetadas pelo Compose.
+---
+
+## 📂 Estrutura de Pastas (Organizada por Domínio)
+
+```text
+src/
+├── infra/            # Infraestrutura Global (Database, Config, Filters)
+├── modules/          # Divisões de Negócio
+│   ├── payments/     # Módulo Core
+│   │   ├── application/   # Use Cases e Ports (Interfaces)
+│   │   ├── domain/        # Entidades e Value Objects
+│   │   ├── infra/         # Repositories e Gateways (Concreto)
+│   │   └── presentation/  # Controllers e DTOs
+│   └── health/       # Módulo de Diagnóstico
+└── shared/           # Código compartilhado transversal
+```
+
+---
+
+## 🚀 Como Executar
+
+### 🐳 Via Docker (Recomendado)
 
 ```bash
 docker-compose up --build
 ```
 
-- **API:** `http://localhost:3000`
-- **Swagger Docs:** `http://localhost:3000/api/docs`
-- **Health Check:** `http://localhost:3000/health`
-- **Banco de Dados:** Porta `5432` (padrão PostgreSQL).
+- **API**: `http://localhost:3000`
+- **Swagger**: `http://localhost:3000/api/docs`
+- **Health Check**: `http://localhost:3000/health`
 
-### 2. Rodando Localmente
+### 💻 Manualmente
 
-Pré-requisitos: Node.js >= 20, npm, Docker (apenas para o DB).
-
-1. Instale dependências: `npm install`
-2. Configure `.env`: Copie `.env.example` para `.env`.
-3. Suba o banco: `docker-compose up postgres -d`
-4. Gere o Prisma Client: `npm run db:generate`
-5. Rode migrations: `npm run db:migrate`
-6. Inicie: `npm run start:dev`
+1. `npm install`
+2. `docker-compose up postgres -d` (Apenas o DB)
+3. `npm run db:migrate`
+4. `npm run db:generate`
+5. `npm run start:dev`
 
 ---
 
-## 🧪 Estratégia de Testes
+## 🧪 Estratégia de Testes & QA
 
-A qualidade e a confiabilidade foram prioridades máximas. A suíte de testes foi desenhada para ser **determinística** e rodar sem dependências de rede.
+### Testes Unitários
 
-### � Testes Unitários (`npm run test`)
+```bash
+npm run test
+```
 
-Cobrem 100% da lógica de negócio e adaptadores de infraestrutura.
+### Testes E2E (Determinísticos)
 
-- **Mocking Extensivo**: Repositórios e Gateways são mockados.
-- **MercadoPagoClient**: Testado isoladamente simulando respostas HTTP (Axios) de sucesso e erro. Nenhum tráfego de rede real ocorre.
+Executam contra um container PostgreSQL exclusivo na porta `5433` para isolamento total.
 
-### 🟡 Testes E2E (`npm run test:e2e`)
+```bash
+npm run test:e2e:run
+```
 
-Garantem que os controladores, DTOs e injeção de dependência funcionam integrados.
+### Cobertura de Código
 
-- **FakePaymentGateway**: O `PaymentGateway` real é substituído (via `overrideProvider`) por um `FakePaymentGateway` durante os testes E2E.
-- **Segurança**: Isso garante que **nenhuma chamada ao Mercado Pago** seja feita durante a execução da pipeline de CI ou testes locais, evitando cobranças indevidas ou "flakiness" por falha de rede.
-
----
-
-## 💳 Integração Mercado Pago
-
-A integração foi arquitetada para ser modular. O sistema suporta pagamentos via **PIX** (simulado internamente) e **Cartão de Crédito** (via Mercado Pago).
-
-### Arquitetura de Integração
-
-- **MercadoPagoClient Module**: Módulo dedicado que encapsula a comunicação HTTP, autenticação e tratamento de erros específicos (400, 401, 422).
-- **Gateway Pattern**: O Use Case desconhece o Mercado Pago; ele interage apenas com a interface `PaymentGateway`.
-
-### Variáveis de Ambiente Necessárias
-
-Para testar a integração REAL (manual/sandbox), configure no `.env`:
-
-- `MERCADOPAGO_ACCESS_TOKEN`: Token de teste (Sandbox).
-- `MERCADOPAGO_NOTIFICATION_URL`: URL pública (ex: ngrok) para receber Webhooks.
-- `MERCADOPAGO_BACK_URL_*`: URLs de redirecionamento.
-
-### Webhooks
-
-O endpoint `POST /api/mercadopago/webhook` processa notificações de status. O fluxo é resiliente e idempotente, garantindo que o status do pagamento seja atualizado corretamente (PENDING -> PAID/FAIL).
+```bash
+npm run test:cov
+# Report: coverage/lcov-report/index.html
+```
 
 ---
 
-## 📚 Documentação (Swagger)
+## 📖 Guia de Uso Rápido (Exemplos)
 
-A API está 100% documentada via OpenAPI/Swagger.
+### Criar Pagamento (CREDIT_CARD)
 
-Acesse: [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+```bash
+curl -X POST http://localhost:3000/api/payment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 250.00,
+    "description": "Compra via API",
+    "payerCpf": "11144477735",
+    "paymentMethod": "CREDIT_CARD"
+  }'
+```
 
-A documentação inclui:
+_Retorna o `mpInitPoint` para redirecionamento do checkout._
 
-- **Schemas**: Contratos de entrada e saída (DTOs).
-- **Respostas HTTP**: Exemplos reais de 200, 201, 400, 404 e 422.
-- **Exemplos de Payload**: JSONs prontos para teste.
+### Listar Pagamentos com Filtros
+
+```bash
+curl "http://localhost:3000/api/payment?cpf=11144477735&paymentMethod=PIX"
+```
+
+### Simular Webhook (Aprovação)
+
+```bash
+curl -X POST http://localhost:3000/api/mercadopago/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "payment",
+    "data": { "id": "TEST-123" }
+  }'
+```
 
 ---
 
-## 🤖 CI / Qualidade
+## 📡 Observabilidade e Logs
 
-O projeto inclui configuração de CI (GitHub Actions) que executa a cada push:
+A aplicação possui um sistema de logs estruturados (JSON) configurado para produção.
 
-1. **Linting**: Garante padrão de código (ESLint/Prettier).
-2. **Build**: Verifica integridade de compilação.
-3. **Tests**: Executa toda a suíte de testes (que, reforçando, não depende de serviços externos).
+### Rastreabilidade (Tracing)
+
+Todo request recebe um `x-correlation-id`. Este ID é propagado para:
+
+1. Logs da aplicação.
+2. Chamadas HTTP externas (ex: Mercado Pago API).
+3. Resposta ao cliente (Header `x-correlation-id`).
+
+### Integração Mercado Pago: Webhooks vs Return URLs
+
+Para garantir o funcionamento correto localmente (com Ngrok) e em produção, separe as responsabilidades:
+
+1. **Notification URL (Webhook)**:
+   - Endpoint: `POST /api/mercadopago/webhook`
+   - Função: Receber notificações assíncronas do Mercado Pago e **atualizar o status** da compra no banco de dados.
+   - Configuração: Deve ser uma URL pública (ex: `https://seu-ngrok.ngrok-free.app/api/mercadopago/webhook`).
+
+2. **Return URLs (Back URLs)**:
+   - Endpoints:
+     - `GET /api/mercadopago/success`
+     - `GET /api/mercadopago/failure`
+     - `GET /api/mercadopago/pending`
+   - Função: Receber o usuário de volta após o pagamento no checkout. Apenas **exibe uma mensagem** ao usuário. Não confiar neste retorno para atualizar status críticos.
+
+**Configuração Recomendada (.env):**
+
+```bash
+# Webhook (Server-to-Server)
+MERCADOPAGO_NOTIFICATION_URL=https://seu-ngrok.ngrok-free.app/api/mercadopago/webhook
+
+# Retorno do Usuário (Browser redirect)
+MERCADOPAGO_SUCCESS_URL=https://seu-ngrok.ngrok-free.app/api/mercadopago/success
+MERCADOPAGO_FAILURE_URL=https://seu-ngrok.ngrok-free.app/api/mercadopago/failure
+MERCADOPAGO_PENDING_URL=https://seu-ngrok.ngrok-free.app/api/mercadopago/pending
+```
 
 ---
 
-## ✅ Checklist de Entrega
+## ✅ Checklist de Qualidade
 
-- [x] Aplicação rodando via Docker.
-- [x] Arquitetura desacoplada (Clean Architecture).
-- [x] Swagger completo e funcional.
-- [x] Testes Unitários passando (Cobertura Sênior).
-- [x] Testes E2E passando (Com isolamento de Gateway).
-- [x] Integração Mercado Pago modularizada.
-- [x] Tratamento de erros consistente.
-- [x] Documentação técnica (README) revisada.
+- [x] **Arquitetura Desacoplada**: Implementação baseada em interfaces (Ports).
+- [x] **Resiliência**: Tratamento de exceções via Exception Filters.
+- [x] **Documentação**: API 100% documentada com Swagger/OpenAPI.
+- [x] **Segurança**: Validação de schema e sanitização de inputs.
+- [x] **Testabilidade**: Infra para testes automatizados CI-ready.

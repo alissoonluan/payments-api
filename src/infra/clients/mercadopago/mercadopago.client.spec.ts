@@ -41,7 +41,6 @@ describe('MercadoPagoClient', () => {
     items: [],
     notification_url: 'http://notify',
     auto_return: 'approved',
-    back_urls: { success: '', failure: '', pending: '' },
     payer: { identification: { type: 'CPF', number: '123' } },
   };
 
@@ -94,7 +93,55 @@ describe('MercadoPagoClient', () => {
       'ECONNREFUSED',
       mockAxiosConfig,
       {},
-      undefined, // No response
+      undefined,
+    );
+
+    jest
+      .spyOn(httpService, 'post')
+      .mockReturnValue(throwError(() => axiosError));
+
+    await expect(client.createPreference(mockPayload)).rejects.toThrow(
+      BadGatewayException,
+    );
+  });
+
+  it('should throw BadGatewayException on 5xx error from MP', async () => {
+    const axiosError = new AxiosError(
+      'Internal Server Error',
+      '500',
+      mockAxiosConfig,
+      {},
+      {
+        status: 500,
+        statusText: 'Internal Server Error',
+        data: { error: 'Server error' },
+        headers: {},
+        config: mockAxiosConfig,
+      },
+    );
+
+    jest
+      .spyOn(httpService, 'post')
+      .mockReturnValue(throwError(() => axiosError));
+
+    await expect(client.createPreference(mockPayload)).rejects.toThrow(
+      BadGatewayException,
+    );
+  });
+
+  it('should throw BadGatewayException on 503 Service Unavailable', async () => {
+    const axiosError = new AxiosError(
+      'Service Unavailable',
+      '503',
+      mockAxiosConfig,
+      {},
+      {
+        status: 503,
+        statusText: 'Service Unavailable',
+        data: {},
+        headers: {},
+        config: mockAxiosConfig,
+      },
     );
 
     jest
@@ -119,5 +166,67 @@ describe('MercadoPagoClient', () => {
 
     const result = await client.getPayment('123');
     expect(result).toEqual({ id: 123, status: 'approved' });
+  });
+
+  it('should throw UnprocessableEntityException when getPayment fails with 404', async () => {
+    const axiosError = new AxiosError(
+      'Not Found',
+      '404',
+      mockAxiosConfig,
+      {},
+      {
+        status: 404,
+        statusText: 'Not Found',
+        data: { message: 'Payment not found' },
+        headers: {},
+        config: mockAxiosConfig,
+      },
+    );
+
+    jest
+      .spyOn(httpService, 'get')
+      .mockReturnValue(throwError(() => axiosError));
+
+    await expect(client.getPayment('invalid-id')).rejects.toThrow(
+      UnprocessableEntityException,
+    );
+  });
+
+  it('should throw BadGatewayException when getPayment fails with network error', async () => {
+    const axiosError = new AxiosError(
+      'Network Error',
+      'ETIMEDOUT',
+      mockAxiosConfig,
+      {},
+      undefined,
+    );
+
+    jest
+      .spyOn(httpService, 'get')
+      .mockReturnValue(throwError(() => axiosError));
+
+    await expect(client.getPayment('123')).rejects.toThrow(BadGatewayException);
+  });
+
+  it('should throw BadGatewayException when getPayment fails with 500', async () => {
+    const axiosError = new AxiosError(
+      'Internal Server Error',
+      '500',
+      mockAxiosConfig,
+      {},
+      {
+        status: 500,
+        statusText: 'Internal Server Error',
+        data: {},
+        headers: {},
+        config: mockAxiosConfig,
+      },
+    );
+
+    jest
+      .spyOn(httpService, 'get')
+      .mockReturnValue(throwError(() => axiosError));
+
+    await expect(client.getPayment('123')).rejects.toThrow(BadGatewayException);
   });
 });

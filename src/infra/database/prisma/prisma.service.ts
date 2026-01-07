@@ -24,7 +24,7 @@ export class PrismaService
     super({
       adapter,
       log: ['error', 'warn'],
-    });
+    } as any);
   }
 
   async onModuleInit(): Promise<void> {

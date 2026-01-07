@@ -2,6 +2,7 @@ export interface MpItem {
   title: string;
   quantity: number;
   unit_price: number;
+  currency_id: string;
 }
 
 export interface MpPayer {
@@ -10,8 +11,7 @@ export interface MpPayer {
     number: string;
   };
 }
-
-export interface MpBackUrls {
+export interface BackUrls {
   success: string;
   failure: string;
   pending: string;
@@ -22,8 +22,8 @@ export interface CreatePreferencePayload {
   external_reference: string;
   payer: MpPayer;
   notification_url: string;
-  back_urls: MpBackUrls;
   auto_return: 'approved' | 'all';
+  back_urls?: BackUrls;
 }
 
 export interface CreatePreferenceResponse {

@@ -49,18 +49,28 @@ export class MercadoPagoClient {
 
   private handleError(error: unknown): void {
     const axiosError = error as {
-      response?: { data?: unknown };
+      response?: { data?: unknown; status?: number };
       message?: string;
     };
     this.logger.error(
       'Mercado Pago API Error',
       axiosError.response?.data || axiosError.message || 'Unknown error',
     );
+
     if (axiosError.response) {
-      throw new UnprocessableEntityException(
-        `Mercado Pago Error: ${JSON.stringify(axiosError.response.data)}`,
+      const status = axiosError.response.status || 500;
+
+      if (status >= 400 && status < 500) {
+        throw new UnprocessableEntityException(
+          `Mercado Pago Error: ${JSON.stringify(axiosError.response.data)}`,
+        );
+      }
+
+      throw new BadGatewayException(
+        `Mercado Pago Server Error: ${JSON.stringify(axiosError.response.data)}`,
       );
     }
+
     throw new BadGatewayException('Failed to communicate with Mercado Pago');
   }
 }

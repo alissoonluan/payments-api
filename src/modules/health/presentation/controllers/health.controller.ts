@@ -1,16 +1,49 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  HealthCheckService,
+  HealthCheck,
+  MemoryHealthIndicator,
+  DiskHealthIndicator,
+  PrismaHealthIndicator,
+} from '@nestjs/terminus';
+import { PrismaService } from '@infra/database/prisma/prisma.service';
 
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
+  constructor(
+    private health: HealthCheckService,
+    private db: PrismaHealthIndicator,
+    private memory: MemoryHealthIndicator,
+    private disk: DiskHealthIndicator,
+    private prismaService: PrismaService,
+  ) {}
+
   @Get()
-  @ApiOperation({ summary: 'Check API health status' })
-  @ApiResponse({ status: 200, description: 'API is healthy' })
+  @HealthCheck()
+  @ApiOperation({ summary: 'Check API and dependencies health status' })
+  @ApiResponse({
+    status: 200,
+    description: 'API and all dependencies are healthy',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'One or more dependencies are unhealthy',
+  })
   check() {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    };
+    return this.health.check([
+      () => this.db.pingCheck('database', this.prismaService),
+
+      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
+
+      () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024),
+
+      () =>
+        this.disk.checkStorage('storage', {
+          path: process.platform === 'win32' ? 'C:\\' : '/',
+          thresholdPercent: 0.9,
+        }),
+    ]);
   }
 }

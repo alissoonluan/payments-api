@@ -28,10 +28,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://admin:admin@localhost:5432/payments_db?schema=public
       MERCADOPAGO_ACCESS_TOKEN: test_token
-      MERCADOPAGO_NOTIFICATION_URL: http://test.com/webhook
-      MERCADOPAGO_BACK_URL_SUCCESS: http://test.com/success
-      MERCADOPAGO_BACK_URL_FAILURE: http://test.com/failure
-      MERCADOPAGO_BACK_URL_PENDING: http://test.com/pending
+      MERCADOPAGO_NOTIFICATION_URL: http://notify
+      MERCADOPAGO_WEBHOOK_SECRET: test_secret
+      MERCADOPAGO_BASE_URL: http://localhost:3001
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: payments_db
@@ -49,6 +48,16 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Wait Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U admin -d payments_db && exit 0
+            sleep 1
+          done
+          exit 1
+        env:
+          PGPASSWORD: admin
 
       - name: Generate Prisma Client
         run: npx prisma generate

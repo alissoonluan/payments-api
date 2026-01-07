@@ -7,10 +7,14 @@ import { PaymentStatus } from '../../domain/payment.enums';
 import { UpdatePaymentDto } from '../dtos/update-payment.dto';
 import { PaymentResponseDto } from '../dtos/payment-response.dto';
 import { PaymentsRepository } from '../ports/payments.repository';
+import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
 
 @Injectable()
 export class UpdatePaymentUseCase {
-  constructor(private readonly paymentsRepository: PaymentsRepository) {}
+  constructor(
+    private readonly paymentsRepository: PaymentsRepository,
+    private readonly logger: AppLoggerService,
+  ) {}
 
   async execute(
     id: string,
@@ -20,8 +24,16 @@ export class UpdatePaymentUseCase {
       throw new UnprocessableEntityException('No fields to update provided');
     }
 
+    this.logger.logInfo('UPDATE_PAYMENT_START', 'Starting payment update', {
+      paymentId: id,
+      updates: dto,
+    });
+
     const existing = await this.paymentsRepository.findById(id);
     if (!existing) {
+      this.logger.logWarn('UPDATE_PAYMENT_NOT_FOUND', 'Payment not found', {
+        paymentId: id,
+      });
       throw new NotFoundException(`Payment with ID ${id} not found`);
     }
 
@@ -34,6 +46,16 @@ export class UpdatePaymentUseCase {
       description: dto.description,
       status: dto.status,
     });
+
+    this.logger.logInfo(
+      'UPDATE_PAYMENT_SUCCESS',
+      'Payment updated successfully',
+      {
+        paymentId: id,
+        oldStatus: existing.status,
+        newStatus: updated.status,
+      },
+    );
 
     return PaymentResponseDto.fromEntity(updated);
   }
@@ -50,11 +72,5 @@ export class UpdatePaymentUseCase {
         'Cannot update status of a FAIL payment',
       );
     }
-
-    // Since input DTO already validates that newStatus is PAID or FAIL,
-    // we only need to ensure we are not trying to go back to PENDING (if DTO allowed it)
-    // or if there are any other specific logic.
-    // The requirement says "Não permitir status voltar para PENDING".
-    // DTO validation handles IsIn([PAID, FAIL]), so newStatus won't be PENDING.
   }
 }

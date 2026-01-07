@@ -24,8 +24,8 @@ export class UpdatePaymentDto {
   description?: string;
 
   @ApiPropertyOptional({
-    enum: PaymentStatus,
-    description: 'Only PAID or FAIL allowed',
+    enum: [PaymentStatus.PAID, PaymentStatus.FAIL],
+    description: 'Status update (only final states allowed: PAID or FAIL)',
   })
   @IsOptional()
   @IsEnum(PaymentStatus)

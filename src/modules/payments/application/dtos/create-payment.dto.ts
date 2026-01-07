@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNumber, IsString, Min, IsNotEmpty } from 'class-validator';
 import { PaymentMethod } from '../../domain/payment.enums';
 import { IsCPF } from '@shared/validators/is-cpf.validator';
+import { Transform } from 'class-transformer';
 
 export class CreatePaymentDto {
   @ApiProperty({ example: 100.5, description: 'Payment amount' })
@@ -13,6 +14,9 @@ export class CreatePaymentDto {
     example: 'Dinner at Beach',
     description: 'Payment description',
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @IsNotEmpty()
   description: string;

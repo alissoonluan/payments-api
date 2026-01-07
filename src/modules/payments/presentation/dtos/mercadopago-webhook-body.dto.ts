@@ -1,20 +1,48 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 class WebhookDataDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Payment ID within data object',
+    example: '12345678',
+  })
   id?: string;
 }
 
 export class MercadoPagoWebhookBodyDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Type of webhook notification',
+    example: 'payment',
+    enum: ['payment', 'merchant_order', 'plan', 'subscription'],
+  })
   type?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Topic of the notification (legacy)',
+    example: 'payment',
+  })
   topic?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Data object containing payment information',
+    type: WebhookDataDto,
+  })
   data?: WebhookDataDto;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Payment ID at root level (alternative format)',
+    example: '12345678',
+  })
   id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Action performed',
+    example: 'payment.created',
+  })
+  action?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether the event is from live or sandbox environment',
+    example: true,
+  })
+  live_mode?: boolean;
 }

@@ -1,4 +1,4 @@
-import { IsCPFConstraint } from './is-cpf.validator';
+import { IsCPFConstraint, IsCPF } from './is-cpf.validator';
 
 describe('IsCPFConstraint', () => {
   let validator: IsCPFConstraint;
@@ -45,6 +45,21 @@ describe('IsCPFConstraint', () => {
   describe('defaultMessage', () => {
     it('should return default error message', () => {
       expect(validator.defaultMessage()).toBe('Invalid CPF checksum');
+    });
+  });
+
+  describe('IsCPF decorator', () => {
+    it('should register the decorator on a class property', () => {
+      class TestClass {
+        @IsCPF()
+        cpf: string;
+      }
+
+      const instance = new TestClass();
+      instance.cpf = '11144477735';
+
+      expect(instance).toBeDefined();
+      expect(instance.cpf).toBe('11144477735');
     });
   });
 });

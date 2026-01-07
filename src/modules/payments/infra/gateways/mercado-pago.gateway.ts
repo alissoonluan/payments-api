@@ -11,40 +11,49 @@ import { CreatePreferencePayload } from '../../../../infra/clients/mercadopago/d
 @Injectable()
 export class MercadoPagoGateway implements PaymentGateway {
   private readonly notificationUrl: string;
-  private readonly backUrlSuccess: string;
-  private readonly backUrlFailure: string;
-  private readonly backUrlPending: string;
+  private readonly successUrl: string;
+  private readonly failureUrl: string;
+  private readonly pendingUrl: string;
 
   constructor(
-    private readonly mercadoPagoService: MercadoPagoClient,
+    private readonly mercadoPagoClient: MercadoPagoClient,
     private readonly configService: ConfigService,
   ) {
     this.notificationUrl = this.configService.getOrThrow<string>(
       'MERCADOPAGO_NOTIFICATION_URL',
     );
-    this.backUrlSuccess = this.configService.getOrThrow<string>(
-      'MERCADOPAGO_BACK_URL_SUCCESS',
+    this.successUrl = this.configService.getOrThrow<string>(
+      'MERCADOPAGO_SUCCESS_URL',
     );
-    this.backUrlFailure = this.configService.getOrThrow<string>(
-      'MERCADOPAGO_BACK_URL_FAILURE',
+    this.failureUrl = this.configService.getOrThrow<string>(
+      'MERCADOPAGO_FAILURE_URL',
     );
-    this.backUrlPending = this.configService.getOrThrow<string>(
-      'MERCADOPAGO_BACK_URL_PENDING',
+    this.pendingUrl = this.configService.getOrThrow<string>(
+      'MERCADOPAGO_PENDING_URL',
     );
   }
 
   async createPreference(
     payment: PaymentEntity,
   ): Promise<CreatePreferenceResult> {
+    const externalReference = payment.mpExternalReference;
+
+    if (!externalReference) {
+      throw new Error(
+        'mpExternalReference is required to create Mercado Pago preference',
+      );
+    }
+
     const payload: CreatePreferencePayload = {
       items: [
         {
-          title: payment.description,
+          title: payment.description?.trim() || 'Payment',
           quantity: 1,
+          currency_id: 'BRL',
           unit_price: payment.amount,
         },
       ],
-      external_reference: payment.mpExternalReference as string,
+      external_reference: externalReference,
       payer: {
         identification: {
           type: 'CPF',
@@ -52,15 +61,15 @@ export class MercadoPagoGateway implements PaymentGateway {
         },
       },
       notification_url: this.notificationUrl,
-      back_urls: {
-        success: this.backUrlSuccess,
-        failure: this.backUrlFailure,
-        pending: this.backUrlPending,
-      },
       auto_return: 'approved',
+      back_urls: {
+        success: this.successUrl,
+        failure: this.failureUrl,
+        pending: this.pendingUrl,
+      },
     };
 
-    const response = await this.mercadoPagoService.createPreference(payload);
+    const response = await this.mercadoPagoClient.createPreference(payload);
 
     return {
       preferenceId: response.id,
@@ -72,7 +81,7 @@ export class MercadoPagoGateway implements PaymentGateway {
   async getPaymentById(
     mpPaymentId: string,
   ): Promise<{ externalReference: string; status: string }> {
-    const response = await this.mercadoPagoService.getPayment(mpPaymentId);
+    const response = await this.mercadoPagoClient.getPayment(mpPaymentId);
 
     return {
       externalReference: response.external_reference,

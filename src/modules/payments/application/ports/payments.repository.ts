@@ -2,7 +2,7 @@ import { PaymentEntity } from '../../domain/payment.entity';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 
 export interface ListPaymentsFilter {
-  cpf?: string;
+  payerCpf?: string;
   paymentMethod?: PaymentMethod;
 }
 

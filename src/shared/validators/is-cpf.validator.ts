@@ -5,7 +5,6 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-// Logic extracted for reuse
 export function validateCPF(cpf: string): boolean {
   if (!cpf) return false;
   const cleanCPF = cpf.replace(/\D/g, '');

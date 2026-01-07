@@ -8,7 +8,7 @@ export class ListPaymentsQueryDto {
   @IsOptional()
   @IsString()
   @IsCPF({ message: 'Invalid CPF' })
-  cpf?: string;
+  payerCpf?: string;
 
   @ApiPropertyOptional({ enum: PaymentMethod })
   @IsOptional()
