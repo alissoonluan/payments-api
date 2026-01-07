@@ -142,6 +142,7 @@ O projeto inclui configuração de CI (GitHub Actions) que executa a cada push:
 - [x] Tratamento de erros consistente.
 - [x] Documentação técnica (README) revisada.
 
----
 
-**Autor:** [Seu Nome/Candidato]
+
+
+
