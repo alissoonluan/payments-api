@@ -34,12 +34,23 @@ model Payment {
   status              PaymentStatus @default(PENDING)
   mpExternalReference String?       @unique
   mpPreferenceId      String?
+  mpPaymentId         String?
   mpInitPoint         String?
   mpSandboxInitPoint  String?
+  failReason          String?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
   @@index([payerCpf])
   @@index([paymentMethod])
   @@map("payments")
+}
+
+model WebhookEvent {
+  id           String   @id @default(uuid())
+  idempotencyKey String   @unique
+  payload      Json
+  createdAt    DateTime @default(now())
+
+  @@map("webhook_events")
 }

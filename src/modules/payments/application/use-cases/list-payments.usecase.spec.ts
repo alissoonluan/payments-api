@@ -4,16 +4,25 @@ import { ListPaymentsQueryDto } from '../dtos/list-payments-query.dto';
 import { PaymentsRepository } from '../ports/payments.repository';
 import { ListPaymentsUseCase } from './list-payments.usecase';
 
+import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
+
 describe('ListPaymentsUseCase', () => {
   let useCase: ListPaymentsUseCase;
   let repository: jest.Mocked<PaymentsRepository>;
+  let logger: jest.Mocked<AppLoggerService>;
 
   beforeEach(() => {
     repository = {
       list: jest.fn(),
     } as unknown as jest.Mocked<PaymentsRepository>;
 
-    useCase = new ListPaymentsUseCase(repository);
+    logger = {
+      logInfo: jest.fn(),
+      logWarn: jest.fn(),
+      logError: jest.fn(),
+    } as any;
+
+    useCase = new ListPaymentsUseCase(repository, logger);
   });
 
   const mockPayment = new PaymentEntity({
@@ -39,12 +48,12 @@ describe('ListPaymentsUseCase', () => {
   });
 
   it('should filter payments by CPF', async () => {
-    const query: ListPaymentsQueryDto = { cpf: '11144477735' };
+    const query: ListPaymentsQueryDto = { payerCpf: '11144477735' };
     repository.list.mockResolvedValue([mockPayment]);
 
     const result = await useCase.execute(query);
 
-    expect(repository.list).toHaveBeenCalledWith({ cpf: '11144477735' });
+    expect(repository.list).toHaveBeenCalledWith({ payerCpf: '11144477735' });
     expect(result).toHaveLength(1);
     expect(result[0].payerCpf).toBe('11144477735');
   });
@@ -73,7 +82,7 @@ describe('ListPaymentsUseCase', () => {
 
   it('should filter payments by both cpf and paymentMethod', async () => {
     const query: ListPaymentsQueryDto = {
-      cpf: '11144477735',
+      payerCpf: '11144477735',
       paymentMethod: PaymentMethod.PIX,
     };
     repository.list.mockResolvedValue([mockPayment]);
@@ -81,7 +90,7 @@ describe('ListPaymentsUseCase', () => {
     const result = await useCase.execute(query);
 
     expect(repository.list).toHaveBeenCalledWith({
-      cpf: '11144477735',
+      payerCpf: '11144477735',
       paymentMethod: PaymentMethod.PIX,
     });
     expect(result).toHaveLength(1);

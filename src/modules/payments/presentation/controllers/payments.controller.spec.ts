@@ -5,6 +5,7 @@ import { UpdatePaymentUseCase } from '../../application/use-cases/update-payment
 import { GetPaymentUseCase } from '../../application/use-cases/get-payment.usecase';
 import { ListPaymentsUseCase } from '../../application/use-cases/list-payments.usecase';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
+import { ListPaymentsQueryDto } from '../../application/dtos/list-payments-query.dto';
 
 describe('PaymentsController', () => {
   let controller: PaymentsController;
@@ -79,7 +80,7 @@ describe('PaymentsController', () => {
 
   describe('list', () => {
     it('should call listPaymentsUseCase', async () => {
-      const query = { cpf: '11144477735' };
+      const query: ListPaymentsQueryDto = { payerCpf: '11144477735' };
       await controller.list(query);
       expect(listUseCase.execute).toHaveBeenCalledWith(query);
     });

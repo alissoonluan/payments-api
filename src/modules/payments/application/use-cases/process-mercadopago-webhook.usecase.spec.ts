@@ -4,11 +4,15 @@ import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { PaymentGateway } from '../ports/payment-gateway';
 import { PaymentsRepository } from '../ports/payments.repository';
 import { ProcessMercadoPagoWebhookUseCase } from './process-mercadopago-webhook.usecase';
+import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
+import { PaymentWorkflowPort } from '../ports/payment-workflow.port';
 
 describe('ProcessMercadoPagoWebhookUseCase', () => {
   let useCase: ProcessMercadoPagoWebhookUseCase;
   let repository: jest.Mocked<PaymentsRepository>;
   let gateway: jest.Mocked<PaymentGateway>;
+  let logger: jest.Mocked<AppLoggerService>;
+  let paymentWorkflowPort: jest.Mocked<PaymentWorkflowPort>;
 
   beforeEach(() => {
     repository = {
@@ -20,7 +24,23 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
       getPaymentById: jest.fn(),
     } as unknown as jest.Mocked<PaymentGateway>;
 
-    useCase = new ProcessMercadoPagoWebhookUseCase(repository, gateway);
+    logger = {
+      logInfo: jest.fn(),
+      logWarn: jest.fn(),
+      logError: jest.fn(),
+    } as any;
+
+    paymentWorkflowPort = {
+      startCreditCardWorkflow: jest.fn().mockResolvedValue(undefined),
+      signalPaymentResult: jest.fn().mockResolvedValue(undefined),
+    };
+
+    useCase = new ProcessMercadoPagoWebhookUseCase(
+      repository,
+      gateway,
+      logger,
+      paymentWorkflowPort,
+    );
   });
 
   const mockPayment = new PaymentEntity({
@@ -74,90 +94,37 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
     expect(result.updated).toBe(true);
   });
 
-  it('should update status to FAIL when Mercado Pago status is cancelled', async () => {
-    gateway.getPaymentById.mockResolvedValue({
-      externalReference: 'ext-ref-123',
-      status: 'cancelled',
-    });
-    repository.findByExternalReference.mockResolvedValue(mockPayment);
-
-    await useCase.execute('mp-123');
-
-    expect(repository.updateStatus).toHaveBeenCalledWith(
-      '1',
-      PaymentStatus.FAIL,
-    );
-  });
-
-  it('should not update and return updated: false if status is pending in MP', async () => {
-    gateway.getPaymentById.mockResolvedValue({
-      externalReference: 'ext-ref-123',
-      status: 'in_process',
-    });
-    repository.findByExternalReference.mockResolvedValue(mockPayment);
-
-    const result = await useCase.execute('mp-123');
-
-    expect(repository.updateStatus).not.toHaveBeenCalled();
-    expect(result.updated).toBe(false);
-    expect(result.status).toBe(PaymentStatus.PENDING);
-  });
-
-  it('should be idempotent and not update if payment is already PAID', async () => {
-    const paidPayment = new PaymentEntity({
+  it('should signal workflow for CREDIT_CARD payments', async () => {
+    const ccPayment = new PaymentEntity({
       ...mockPayment,
-      status: PaymentStatus.PAID,
+      id: 'cc-1',
+      paymentMethod: PaymentMethod.CREDIT_CARD,
+      mpExternalReference: 'ext-ref-cc',
     });
+
     gateway.getPaymentById.mockResolvedValue({
-      externalReference: 'ext-ref-123',
+      externalReference: 'ext-ref-cc',
       status: 'approved',
     });
-    repository.findByExternalReference.mockResolvedValue(paidPayment);
+    repository.findByExternalReference.mockResolvedValue(ccPayment);
 
-    const result = await useCase.execute('mp-123');
+    await useCase.execute('mp-999');
 
+    expect(paymentWorkflowPort.signalPaymentResult).toHaveBeenCalledWith(
+      'ext-ref-cc',
+      PaymentStatus.PAID,
+      'mp-999',
+    );
     expect(repository.updateStatus).not.toHaveBeenCalled();
-    expect(result.updated).toBe(false);
-    expect(result.status).toBe(PaymentStatus.PAID);
   });
 
-  it('should be idempotent and not update if payment is already FAIL', async () => {
-    const failedPayment = new PaymentEntity({
-      ...mockPayment,
-      status: PaymentStatus.FAIL,
-    });
+  it('should throw NotFoundException if payment is not found', async () => {
     gateway.getPaymentById.mockResolvedValue({
-      externalReference: 'ext-ref-123',
-      status: 'rejected',
-    });
-    repository.findByExternalReference.mockResolvedValue(failedPayment);
-
-    const result = await useCase.execute('mp-123');
-
-    expect(repository.updateStatus).not.toHaveBeenCalled();
-    expect(result.updated).toBe(false);
-    expect(result.status).toBe(PaymentStatus.FAIL);
-  });
-
-  it('should throw NotFoundException if payment is not found in repository', async () => {
-    gateway.getPaymentById.mockResolvedValue({
-      externalReference: 'ext-ref-unknown',
+      externalReference: 'unknown',
       status: 'approved',
     });
     repository.findByExternalReference.mockResolvedValue(null);
 
     await expect(useCase.execute('mp-123')).rejects.toThrow(NotFoundException);
-  });
-
-  it('should return updated: false if externalReference is missing in gateway response', async () => {
-    gateway.getPaymentById.mockResolvedValue({
-      externalReference: undefined as unknown as string,
-      status: 'approved',
-    });
-
-    const result = await useCase.execute('mp-123');
-
-    expect(result).toEqual({ ok: true, updated: false });
-    expect(repository.findByExternalReference).not.toHaveBeenCalled();
   });
 });

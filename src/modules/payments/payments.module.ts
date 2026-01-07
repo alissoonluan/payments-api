@@ -12,19 +12,30 @@ import { MercadoPagoGateway } from './infra/gateways/mercado-pago.gateway';
 import { MercadoPagoWebhookController } from './presentation/controllers/mercadopago-webhook.controller';
 import { ProcessMercadoPagoWebhookUseCase } from './application/use-cases/process-mercadopago-webhook.usecase';
 import { WebhookIdempotencyService } from './application/services/webhook-idempotency.service';
+import { MercadoPagoWebhookService } from './application/services/mercadopago-webhook.service';
+import { PaymentActivities } from './infra/temporal/activities/payment.activities';
+import { TemporalModule } from './infra/temporal/temporal.module';
 
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../infra/database/prisma/prisma.module';
 import { MercadoPagoClientModule } from '../../infra/clients/mercadopago/mercadopago-client.module';
 
 import { MercadoPagoReturnController } from './presentation/controllers/mercadopago-return.controller';
+import { TemporalController } from './infra/temporal/temporal.controller';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, HttpModule, MercadoPagoClientModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    HttpModule,
+    MercadoPagoClientModule,
+    TemporalModule,
+  ],
   controllers: [
     PaymentsController,
     MercadoPagoWebhookController,
     MercadoPagoReturnController,
+    TemporalController,
   ],
   providers: [
     CreatePaymentUseCase,
@@ -32,6 +43,7 @@ import { MercadoPagoReturnController } from './presentation/controllers/mercadop
     GetPaymentUseCase,
     ListPaymentsUseCase,
     ProcessMercadoPagoWebhookUseCase,
+    PaymentActivities,
     {
       provide: PaymentsRepository,
       useClass: PaymentsPrismaRepository,
@@ -41,6 +53,7 @@ import { MercadoPagoReturnController } from './presentation/controllers/mercadop
       useClass: MercadoPagoGateway,
     },
     WebhookIdempotencyService,
+    MercadoPagoWebhookService,
   ],
 })
 export class PaymentsModule {}

@@ -1,6 +1,9 @@
-version: '3.8'
+version: "3.8"
 
 services:
+  # ---------------------------------------------------------
+  # Database for Payments API
+  # ---------------------------------------------------------
   postgres:
     image: postgres:15-alpine
     container_name: payments_postgres
@@ -15,13 +18,76 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-payments_db}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
+  # ---------------------------------------------------------
+  # Database for Temporal Server
+  # ---------------------------------------------------------
+  temporal-postgres:
+    image: postgres:15-alpine
+    container_name: temporal_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------
+  # Temporal Server
+  # ---------------------------------------------------------
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: temporal
+    restart: always
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgres
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------
+  # Temporal Web UI
+  # ---------------------------------------------------------
+  temporal-ui:
+    image: temporalio/ui:2.27.0
+    container_name: temporal_ui
+    restart: always
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:8080
+    ports:
+      - "8080:8080"
+
+  # ---------------------------------------------------------
+  # Payments API (App)
+  # ---------------------------------------------------------
   app:
     build:
       context: .
+      dockerfile: Dockerfile
     container_name: payments_app
     restart: always
     ports:
@@ -29,15 +95,46 @@ services:
     environment:
       PORT: ${PORT:-3000}
       NODE_ENV: development
-      CHOKIDAR_USEPOLLING: "true"
       DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@postgres:5432/${POSTGRES_DB:-payments_db}?schema=public
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TASK_QUEUE: payments-queue
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
     depends_on:
       postgres:
+        condition: service_healthy
+      temporal:
         condition: service_healthy
     volumes:
       - .:/app
       - /app/node_modules
-      - /app/node_modules/.prisma
+    command: npm run start:docker
+
+  # ---------------------------------------------------------
+  # Temporal Worker
+  # ---------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payments_temporal_worker
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@postgres:5432/${POSTGRES_DB:-payments_db}?schema=public
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TASK_QUEUE: payments-queue
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      app:
+        condition: service_started
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run temporal:worker
 
 volumes:
   postgres_data:
+  temporal_pgdata:

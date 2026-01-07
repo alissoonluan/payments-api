@@ -13,8 +13,10 @@ export class PaymentPrismaMapper {
       status: model.status as PaymentStatus,
       mpExternalReference: (model.mpExternalReference as string) ?? undefined,
       mpPreferenceId: (model.mpPreferenceId as string) ?? undefined,
+      mpPaymentId: (model.mpPaymentId as string) ?? undefined,
       mpInitPoint: (model.mpInitPoint as string) ?? undefined,
       mpSandboxInitPoint: (model.mpSandboxInitPoint as string) ?? undefined,
+      failReason: (model.failReason as string) ?? undefined,
       createdAt: model.createdAt,
       updatedAt: model.updatedAt,
     });
@@ -32,8 +34,10 @@ export class PaymentPrismaMapper {
       status: entity.status,
       mpExternalReference: entity.mpExternalReference,
       mpPreferenceId: entity.mpPreferenceId,
+      mpPaymentId: entity.mpPaymentId,
       mpInitPoint: entity.mpInitPoint,
       mpSandboxInitPoint: entity.mpSandboxInitPoint,
+      failReason: entity.failReason,
     };
   }
 
@@ -59,12 +63,20 @@ export class PaymentPrismaMapper {
       updateData.mpPreferenceId = entity.mpPreferenceId;
     }
 
+    if (entity.mpPaymentId !== undefined) {
+      updateData.mpPaymentId = entity.mpPaymentId;
+    }
+
     if (entity.mpInitPoint !== undefined) {
       updateData.mpInitPoint = entity.mpInitPoint;
     }
 
     if (entity.mpSandboxInitPoint !== undefined) {
       updateData.mpSandboxInitPoint = entity.mpSandboxInitPoint;
+    }
+
+    if (entity.failReason !== undefined) {
+      updateData.failReason = entity.failReason;
     }
 
     return updateData;

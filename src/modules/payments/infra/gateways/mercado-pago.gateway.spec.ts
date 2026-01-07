@@ -19,6 +19,9 @@ describe('MercadoPagoGateway', () => {
       getOrThrow: jest.fn((key: string): string => {
         const config: Record<string, string> = {
           MERCADOPAGO_NOTIFICATION_URL: 'http://notify',
+          MERCADOPAGO_SUCCESS_URL: 'http://success',
+          MERCADOPAGO_FAILURE_URL: 'http://failure',
+          MERCADOPAGO_PENDING_URL: 'http://pending',
         };
         return config[key] || '';
       }),
@@ -66,6 +69,11 @@ describe('MercadoPagoGateway', () => {
       },
       notification_url: 'http://notify',
       auto_return: 'approved',
+      back_urls: {
+        success: 'http://success',
+        failure: 'http://failure',
+        pending: 'http://pending',
+      },
     });
 
     expect(result).toEqual({

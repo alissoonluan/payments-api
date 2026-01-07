@@ -5,113 +5,111 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Headers,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ProcessMercadoPagoWebhookUseCase } from '../../application/use-cases/process-mercadopago-webhook.usecase';
-
-import { MercadoPagoWebhookBodyDto } from '../../presentation/dtos/mercadopago-webhook-body.dto';
-import { MercadoPagoWebhookQueryDto } from '../../presentation/dtos/mercadopago-webhook-query.dto';
-import { MercadoPagoWebhookResponseDto } from '../../presentation/dtos/mercadopago-webhook-response.dto';
+import { MercadoPagoWebhookService } from '../../application/services/mercadopago-webhook.service';
 import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
-import { WebhookIdempotencyService } from '../../application/services/webhook-idempotency.service';
 
 @ApiTags('Payments Webhooks')
-@Controller('api/mercadopago')
+@Controller('api/webhooks/mercadopago')
+@UsePipes(
+  new ValidationPipe({
+    validateCustomDecorators: false,
+    whitelist: false,
+    forbidNonWhitelisted: false,
+  }),
+)
 export class MercadoPagoWebhookController {
   constructor(
-    private readonly processWebhookUseCase: ProcessMercadoPagoWebhookUseCase,
+    private readonly webhookService: MercadoPagoWebhookService,
     private readonly logger: AppLoggerService,
-    private readonly idempotencyService: WebhookIdempotencyService,
   ) {}
 
-  @Post('webhook')
+  @Post()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Handle Mercado Pago webhook notifications',
-    description:
-      'Processes webhook notifications from Mercado Pago. Only processes "payment" type webhooks. ' +
-      'Payment ID can be sent via query param "data.id" or in request body (data.id or id). ' +
-      'Webhook is idempotent - duplicate notifications are safely ignored.',
+    description: 'Robust webhook handler. Always returns 200 to Mercado Pago.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Webhook processed successfully (or safely ignored)',
-    type: MercadoPagoWebhookResponseDto,
-    schema: {
-      example: {
-        ok: true,
-      },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid webhook payload',
-    schema: {
-      example: {
-        message: 'Validation failed',
-        error: 'Bad Request',
-        statusCode: 400,
-      },
-    },
-  })
+  @ApiResponse({ status: 200, description: 'Webhook received' })
   async handleWebhook(
-    @Query() query: MercadoPagoWebhookQueryDto,
-    @Body() body: MercadoPagoWebhookBodyDto,
-  ): Promise<MercadoPagoWebhookResponseDto> {
-    const type = query.type || body.type;
-    const mpPaymentId = this.extractMpPaymentId(query, body);
+    @Query() query: any,
+    @Body() body: any,
+    @Headers('x-request-id') requestId?: string,
+  ): Promise<{ ok: boolean }> {
+    const startTime = Date.now();
 
-    this.logger.logInfo('MP_WEBHOOK_RECEIVED', 'Webhook received', {
-      type,
-      mpPaymentId,
-      action: body.action,
-      live_mode: body.live_mode,
-      source: 'mercadopago',
-    });
+    try {
+      const paymentId = this.extractId(query, body);
+      const type = query?.type || body?.type;
+      const topic = query?.topic || body?.action || body?.type;
 
-    if (type === 'payment' && mpPaymentId) {
-      const idempotencyKey = `mp_payment_${mpPaymentId}_${body.action || 'update'}`;
+      this.logger.logInfo(
+        'MP_WEBHOOK_RECEIVED',
+        `[mercadopago-webhook] Received topic=${topic} type=${type} paymentId=${paymentId}`,
+        {
+          requestId,
+          query,
+          body,
+        },
+      );
 
-      if (this.idempotencyService.isDuplicate(idempotencyKey)) {
-        this.logger.logInfo('MP_WEBHOOK_DUPLICATE', 'Duplicate event ignored', {
-          idempotencyKey,
-          duplicate_event_ignored: true,
-        });
+      if (topic === 'merchant_order') {
+        this.logger.logInfo(
+          'MP_WEBHOOK_IGNORED',
+          `[mercadopago-webhook] Ignoring merchant_order topic`,
+          { paymentId },
+        );
         return { ok: true };
       }
 
-      await this.processWebhookUseCase.execute(mpPaymentId);
+      if (!paymentId) {
+        this.logger.logWarn(
+          'MP_WEBHOOK_NO_ID',
+          `[mercadopago-webhook] No paymentId found in request`,
+          { query, body },
+        );
+        return { ok: true };
+      }
 
-      this.idempotencyService.markAsProcessed(idempotencyKey);
+      await this.webhookService.handleEvent({
+        paymentId,
+        action: topic,
+        type,
+        rawPayload: body,
+        requestId,
+      });
 
+      const durationMs = Date.now() - startTime;
       this.logger.logInfo(
-        'MP_WEBHOOK_PROCESSED',
-        'Webhook processed successfully',
+        'MP_WEBHOOK_SUCCESS',
+        `[mercadopago-webhook] Processed successfully durationMs=${durationMs}`,
+        { paymentId },
+      );
+
+      return { ok: true };
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      this.logger.logError(
+        'MP_WEBHOOK_INTERNAL_ERROR',
+        `[mercadopago-webhook] Internal error durationMs=${durationMs}`,
+        error as Error,
         {
-          mpPaymentId,
+          body,
         },
       );
-    }
 
-    return { ok: true };
+      return { ok: true };
+    }
   }
 
-  private extractMpPaymentId(
-    query: MercadoPagoWebhookQueryDto,
-    body: MercadoPagoWebhookBodyDto,
-  ): string | undefined {
-    if (query['data.id']) {
-      return query['data.id'];
-    }
-
-    if (body.data?.id) {
-      return body.data.id;
-    }
-
-    if (body.id) {
-      return body.id;
-    }
-
-    return undefined;
+  private extractId(query: any, body: any): string | undefined {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return (
+      query?.['data.id'] || body?.data?.id || query?.id || body?.id || undefined
+    );
   }
 }

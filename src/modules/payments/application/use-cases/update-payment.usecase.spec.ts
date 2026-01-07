@@ -4,9 +4,12 @@ import { PaymentsRepository } from '../ports/payments.repository';
 import { PaymentEntity } from '../../domain/payment.entity';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 
+import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
+
 describe('UpdatePaymentUseCase', () => {
   let useCase: UpdatePaymentUseCase;
   let repository: jest.Mocked<PaymentsRepository>;
+  let logger: jest.Mocked<AppLoggerService>;
 
   beforeEach(() => {
     repository = {
@@ -14,7 +17,13 @@ describe('UpdatePaymentUseCase', () => {
       update: jest.fn(),
     } as unknown as jest.Mocked<PaymentsRepository>;
 
-    useCase = new UpdatePaymentUseCase(repository);
+    logger = {
+      logInfo: jest.fn(),
+      logWarn: jest.fn(),
+      logError: jest.fn(),
+    } as any;
+
+    useCase = new UpdatePaymentUseCase(repository, logger);
   });
 
   it('should throw NotFoundException if payment does not exist', async () => {

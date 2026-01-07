@@ -47,6 +47,18 @@ export class PaymentResponseDto {
   })
   mpSandboxInitPoint?: string;
 
+  @ApiPropertyOptional({
+    example: '123456789',
+    description: 'Mercado Pago payment ID',
+  })
+  mpPaymentId?: string;
+
+  @ApiPropertyOptional({
+    example: 'mp_preference_creation_failed',
+    description: 'Reason for payment failure (only when status is FAIL)',
+  })
+  failReason?: string;
+
   @ApiProperty({ example: '2024-01-06T12:00:00Z' })
   createdAt: Date;
 
@@ -63,8 +75,10 @@ export class PaymentResponseDto {
       status: entity.status,
       mpExternalReference: entity.mpExternalReference,
       mpPreferenceId: entity.mpPreferenceId,
+      mpPaymentId: entity.mpPaymentId,
       mpInitPoint: entity.mpInitPoint,
       mpSandboxInitPoint: entity.mpSandboxInitPoint,
+      failReason: entity.failReason,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     };

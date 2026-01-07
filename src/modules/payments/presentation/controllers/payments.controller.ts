@@ -10,7 +10,7 @@ import { ListPaymentsQueryDto } from '../../application/dtos/list-payments-query
 import { PaymentResponseDto } from '../../application/dtos/payment-response.dto';
 
 @ApiTags('Payments')
-@Controller('api/payment')
+@Controller('api/payments')
 export class PaymentsController {
   constructor(
     private readonly createPaymentUseCase: CreatePaymentUseCase,

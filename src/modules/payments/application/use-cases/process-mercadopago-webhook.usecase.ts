@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentStatus } from '../../domain/payment.enums';
+import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { PaymentGateway } from '../ports/payment-gateway';
 import { PaymentsRepository } from '../ports/payments.repository';
 import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
+import { PaymentWorkflowPort } from '../ports/payment-workflow.port';
 
 export interface ProcessMercadoPagoWebhookResult {
   ok: boolean;
@@ -16,23 +17,29 @@ export class ProcessMercadoPagoWebhookUseCase {
     private readonly paymentsRepository: PaymentsRepository,
     private readonly paymentGateway: PaymentGateway,
     private readonly logger: AppLoggerService,
+    private readonly paymentWorkflowPort: PaymentWorkflowPort,
   ) {}
 
   async execute(mpPaymentId: string): Promise<ProcessMercadoPagoWebhookResult> {
-    this.logger.logInfo('WEBHOOK_PROCESS_START', 'Processing webhook', {
-      mpPaymentId,
-    });
+    this.logger.logInfo(
+      'WEBHOOK_FETCH_MP_START',
+      `Fetching payment details from Mercado Pago`,
+      { mpPaymentId },
+    );
 
     const mpPayment = await this.paymentGateway.getPaymentById(mpPaymentId);
 
+    this.logger.logInfo('WEBHOOK_MP_FETCHED', `Mercado Pago payment fetched`, {
+      mpPaymentId,
+      status: mpPayment.status,
+      externalReference: mpPayment.externalReference,
+    });
+
     if (!mpPayment.externalReference) {
       this.logger.logWarn(
-        'WEBHOOK_NO_EXT_REF',
-        'No external reference in MP payment',
-        {
-          mpPaymentId,
-          mpStatus: mpPayment.status,
-        },
+        'WEBHOOK_NO_EXTERNAL_REF',
+        'No external reference found in Mercado Pago payment',
+        { mpPaymentId },
       );
       return { ok: true, updated: false };
     }
@@ -46,60 +53,80 @@ export class ProcessMercadoPagoWebhookUseCase {
         'WEBHOOK_PAYMENT_NOT_FOUND',
         'Payment not found for external reference',
         new Error('Payment Not Found'),
-        {
-          externalReference: mpPayment.externalReference,
-        },
+        { externalReference: mpPayment.externalReference, mpPaymentId },
       );
       throw new NotFoundException(
         `Payment with external reference ${mpPayment.externalReference} not found`,
       );
     }
 
-    this.logger.logInfo('WEBHOOK_PAYMENT_FOUND', 'Found associated payment', {
-      paymentId: payment.id,
-      currentStatus: payment.status,
-      mpStatus: mpPayment.status,
-    });
-
     if (payment.status !== PaymentStatus.PENDING) {
       this.logger.logInfo(
-        'WEBHOOK_ALREADY_PROCESSED',
-        'Payment already processed',
+        'WEBHOOK_ALREADY_FINAL',
+        `Payment already in final state, ignoring webhook`,
         {
           paymentId: payment.id,
-          status: payment.status,
+          currentStatus: payment.status,
+          mpStatus: mpPayment.status,
         },
       );
-      return {
-        ok: true,
-        updated: false,
-        status: payment.status,
-      };
+      return { ok: true, updated: false, status: payment.status };
     }
 
     const newStatus = this.mapStatus(mpPayment.status);
 
-    if (newStatus === PaymentStatus.PENDING) {
-      return {
-        ok: true,
-        updated: false,
-        status: PaymentStatus.PENDING,
-      };
+    if (payment.paymentMethod === PaymentMethod.CREDIT_CARD) {
+      try {
+        await this.paymentWorkflowPort.signalPaymentResult(
+          payment.mpExternalReference!,
+          newStatus,
+          mpPaymentId,
+        );
+
+        this.logger.logInfo(
+          'WEBHOOK_SIGNAL_SENT',
+          `Signal sent to Temporal workflow`,
+          {
+            paymentId: payment.id,
+            workflowId: `payment-${payment.mpExternalReference}`,
+            status: newStatus,
+            mpPaymentId,
+          },
+        );
+
+        return { ok: true, updated: true, status: newStatus };
+      } catch (err) {
+        this.logger.logWarn(
+          'WEBHOOK_SIGNAL_FAILED',
+          'Failed to signal workflow, updating payment directly',
+          {
+            paymentId: payment.id,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
+      }
     }
 
-    await this.paymentsRepository.updateStatus(payment.id, newStatus);
-
-    this.logger.logInfo('WEBHOOK_STATUS_UPDATED', 'Payment status updated', {
-      paymentId: payment.id,
-      oldStatus: payment.status,
-      newStatus,
+    await this.paymentsRepository.update(payment.id, {
+      status: newStatus,
+      mpPaymentId,
+      failReason:
+        newStatus === PaymentStatus.FAIL
+          ? `mp_status_${mpPayment.status}`
+          : undefined,
     });
 
-    return {
-      ok: true,
-      updated: true,
-      status: newStatus,
-    };
+    this.logger.logInfo(
+      'WEBHOOK_STATUS_UPDATED',
+      `Payment status updated directly`,
+      {
+        paymentId: payment.id,
+        oldStatus: payment.status,
+        newStatus,
+      },
+    );
+
+    return { ok: true, updated: true, status: newStatus };
   }
 
   private mapStatus(mpStatus: string): PaymentStatus {
@@ -111,6 +138,8 @@ export class ProcessMercadoPagoWebhookUseCase {
       charged_back: PaymentStatus.FAIL,
       in_process: PaymentStatus.PENDING,
       pending: PaymentStatus.PENDING,
+      authorized: PaymentStatus.PENDING,
+      in_mediation: PaymentStatus.PENDING,
     };
 
     return statusMap[mpStatus] || PaymentStatus.PENDING;

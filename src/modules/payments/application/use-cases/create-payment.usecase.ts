@@ -1,5 +1,4 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import { CreatePaymentDto } from '../dtos/create-payment.dto';
 import { PaymentResponseDto } from '../dtos/payment-response.dto';
 import { PaymentsRepository } from '../ports/payments.repository';
@@ -8,6 +7,7 @@ import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { validateCPF } from '@shared/validators/is-cpf.validator';
 import { PaymentEntity } from '../../domain/payment.entity';
 import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
+import { PaymentWorkflowPort } from '../ports/payment-workflow.port';
 
 @Injectable()
 export class CreatePaymentUseCase {
@@ -15,6 +15,7 @@ export class CreatePaymentUseCase {
     private readonly paymentsRepository: PaymentsRepository,
     private readonly paymentGateway: PaymentGateway,
     private readonly logger: AppLoggerService,
+    private readonly paymentWorkflowPort: PaymentWorkflowPort,
   ) {}
 
   async execute(dto: CreatePaymentDto): Promise<PaymentResponseDto> {
@@ -42,37 +43,61 @@ export class CreatePaymentUseCase {
       status: PaymentStatus.PENDING,
     };
 
-    if (dto.paymentMethod === PaymentMethod.CREDIT_CARD) {
-      paymentData.mpExternalReference = randomUUID();
+    if (dto.paymentMethod === PaymentMethod.PIX) {
+      const payment = await this.paymentsRepository.create(paymentData);
 
       this.logger.logInfo(
-        'CREATE_PAYMENT_GATEWAY_INIT',
-        'Initializing gateway preference',
+        'CREATE_PAYMENT_SUCCESS',
+        'PIX payment created successfully',
         {
-          externalReference: paymentData.mpExternalReference,
+          paymentId: payment.id,
+          status: payment.status,
         },
       );
 
-      const gatewayResult = await this.paymentGateway.createPreference({
-        ...paymentData,
-      } as PaymentEntity);
-
-      paymentData.mpPreferenceId = gatewayResult.preferenceId;
-      paymentData.mpInitPoint = gatewayResult.initPoint;
-      paymentData.mpSandboxInitPoint = gatewayResult.sandboxInitPoint;
+      return PaymentResponseDto.fromEntity(payment);
     }
 
     const payment = await this.paymentsRepository.create(paymentData);
 
+    await this.paymentsRepository.update(payment.id, {
+      mpExternalReference: payment.id,
+    });
+
+    const updatedPayment = await this.paymentsRepository.findById(payment.id);
+
     this.logger.logInfo(
-      'CREATE_PAYMENT_SUCCESS',
-      'Payment created successfully',
+      'CREATE_PAYMENT_WORKFLOW_START',
+      'Starting Temporal workflow for CREDIT_CARD payment',
       {
-        paymentId: payment.id,
-        status: payment.status,
+        paymentId: updatedPayment!.id,
+        externalReference: updatedPayment!.mpExternalReference,
       },
     );
 
-    return PaymentResponseDto.fromEntity(payment);
+    await this.paymentWorkflowPort.startCreditCardWorkflow(
+      updatedPayment!.id,
+      updatedPayment!.mpExternalReference!,
+    );
+
+    let finalPayment = updatedPayment!;
+    const startTime = Date.now();
+    while (!finalPayment.mpInitPoint && Date.now() - startTime < 5000) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const found = await this.paymentsRepository.findById(payment.id);
+      if (found) finalPayment = found;
+    }
+
+    this.logger.logInfo(
+      'CREATE_PAYMENT_SUCCESS',
+      'CREDIT_CARD payment created and workflow started',
+      {
+        paymentId: finalPayment.id,
+        status: finalPayment.status,
+        hasInitPoint: !!finalPayment.mpInitPoint,
+      },
+    );
+
+    return PaymentResponseDto.fromEntity(finalPayment);
   }
 }

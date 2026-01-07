@@ -9,8 +9,10 @@ export class PaymentEntity {
   status: PaymentStatus;
   mpExternalReference?: string;
   mpPreferenceId?: string;
+  mpPaymentId?: string;
   mpInitPoint?: string;
   mpSandboxInitPoint?: string;
+  failReason?: string;
   createdAt: Date;
   updatedAt: Date;
 

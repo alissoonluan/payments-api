@@ -1,20 +1,16 @@
-FROM node:24.12.0-slim
+FROM node:20-slim
 
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl netcat-traditional && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install dependencies (deterministic)
 COPY package*.json ./
-RUN npm ci
-RUN npm ci
+RUN npm install
 
-# Prisma generate (so imports/types are available)
 COPY prisma ./prisma/
 RUN npx prisma generate
 
-# Source code
 COPY . .
 
 EXPOSE 3000
-CMD ["npm", "run", "start:docker"]
+CMD ["npm", "run", "start:dev"]

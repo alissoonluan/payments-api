@@ -4,16 +4,25 @@ import { PaymentsRepository } from '../ports/payments.repository';
 import { PaymentEntity } from '../../domain/payment.entity';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 
+import { AppLoggerService } from '../../../../shared/logger/app-logger.service';
+
 describe('GetPaymentUseCase', () => {
   let useCase: GetPaymentUseCase;
   let repository: jest.Mocked<PaymentsRepository>;
+  let logger: jest.Mocked<AppLoggerService>;
 
   beforeEach(() => {
     repository = {
       findById: jest.fn(),
     } as unknown as jest.Mocked<PaymentsRepository>;
 
-    useCase = new GetPaymentUseCase(repository);
+    logger = {
+      logInfo: jest.fn(),
+      logWarn: jest.fn(),
+      logError: jest.fn(),
+    } as any;
+
+    useCase = new GetPaymentUseCase(repository, logger);
   });
 
   it('should return payment when it exists', async () => {
