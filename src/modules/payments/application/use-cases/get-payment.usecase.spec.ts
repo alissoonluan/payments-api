@@ -31,6 +31,7 @@ describe('GetPaymentUseCase', () => {
     const result = await useCase.execute('1');
 
     expect(result).toEqual(payment);
+
     expect(repository.findById).toHaveBeenCalledWith('1');
   });
 

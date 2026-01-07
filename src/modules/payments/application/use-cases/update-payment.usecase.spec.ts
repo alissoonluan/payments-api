@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { NotFoundException } from '@nestjs/common';
 import { UpdatePaymentUseCase } from './update-payment.usecase';
 import { PaymentsRepository } from '../ports/payments.repository';

@@ -1,9 +1,17 @@
 import { HttpService } from '@nestjs/axios';
 import { Test, TestingModule } from '@nestjs/testing';
 import { of, throwError } from 'rxjs';
-import { AxiosResponse, AxiosError, InternalAxiosRequestConfig, AxiosHeaders } from 'axios';
+import {
+  AxiosResponse,
+  AxiosError,
+  InternalAxiosRequestConfig,
+  AxiosHeaders,
+} from 'axios';
 import { MercadoPagoClient } from './mercadopago.client';
-import { BadGatewayException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { CreatePreferencePayload } from './dtos/create-preference.dto';
 
 describe('MercadoPagoClient', () => {
@@ -71,7 +79,9 @@ describe('MercadoPagoClient', () => {
       },
     );
 
-    jest.spyOn(httpService, 'post').mockReturnValue(throwError(() => axiosError));
+    jest
+      .spyOn(httpService, 'post')
+      .mockReturnValue(throwError(() => axiosError));
 
     await expect(client.createPreference(mockPayload)).rejects.toThrow(
       UnprocessableEntityException,
@@ -87,7 +97,9 @@ describe('MercadoPagoClient', () => {
       undefined, // No response
     );
 
-    jest.spyOn(httpService, 'post').mockReturnValue(throwError(() => axiosError));
+    jest
+      .spyOn(httpService, 'post')
+      .mockReturnValue(throwError(() => axiosError));
 
     await expect(client.createPreference(mockPayload)).rejects.toThrow(
       BadGatewayException,

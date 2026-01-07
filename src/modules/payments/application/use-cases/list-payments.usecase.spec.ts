@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { PaymentEntity } from '../../domain/payment.entity';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { ListPaymentsQueryDto } from '../dtos/list-payments-query.dto';

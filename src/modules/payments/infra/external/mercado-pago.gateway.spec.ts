@@ -16,14 +16,14 @@ describe('MercadoPagoGateway', () => {
     } as unknown as jest.Mocked<MercadoPagoClient>;
 
     configService = {
-      getOrThrow: jest.fn((key: string) => {
-        const config = {
+      getOrThrow: jest.fn((key: string): string => {
+        const config: Record<string, string> = {
           MERCADOPAGO_NOTIFICATION_URL: 'http://notify',
           MERCADOPAGO_BACK_URL_SUCCESS: 'http://success',
           MERCADOPAGO_BACK_URL_FAILURE: 'http://failure',
           MERCADOPAGO_BACK_URL_PENDING: 'http://pending',
         };
-        return config[key];
+        return config[key] || '';
       }),
     } as unknown as jest.Mocked<ConfigService>;
 

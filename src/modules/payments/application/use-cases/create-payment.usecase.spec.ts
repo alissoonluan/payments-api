@@ -47,7 +47,7 @@ describe('CreatePaymentUseCase', () => {
     const dto = {
       amount: 100,
       description: 'Test PIX',
-      payerCpf: '11144477735', // Valid CPF
+      payerCpf: '11144477735',
       paymentMethod: PaymentMethod.PIX,
     };
 
@@ -64,7 +64,8 @@ describe('CreatePaymentUseCase', () => {
     const result = await useCase.execute(dto);
 
     expect(result.paymentMethod).toBe(PaymentMethod.PIX);
-    expect(gateway.createPreference).not.toHaveBeenCalled();
+
+    expect(gateway.createPreference).toHaveBeenCalledTimes(0);
     expect(repository.create).toHaveBeenCalled();
   });
 

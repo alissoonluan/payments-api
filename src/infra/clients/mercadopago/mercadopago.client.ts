@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { CreatePreferencePayload, CreatePreferenceResponse } from './dtos/create-preference.dto';
+import {
+  CreatePreferencePayload,
+  CreatePreferenceResponse,
+} from './dtos/create-preference.dto';
 import { GetPaymentResponse } from './dtos/get-payment.dto';
 
 @Injectable()
@@ -15,10 +18,15 @@ export class MercadoPagoClient {
 
   constructor(private readonly httpService: HttpService) {}
 
-  async createPreference(payload: CreatePreferencePayload): Promise<CreatePreferenceResponse> {
+  async createPreference(
+    payload: CreatePreferencePayload,
+  ): Promise<CreatePreferenceResponse> {
     try {
       const response = await firstValueFrom(
-        this.httpService.post<CreatePreferenceResponse>('/checkout/preferences', payload),
+        this.httpService.post<CreatePreferenceResponse>(
+          '/checkout/preferences',
+          payload,
+        ),
       );
       return response.data;
     } catch (error: any) {
@@ -39,14 +47,18 @@ export class MercadoPagoClient {
     }
   }
 
-  private handleError(error: any): void {
+  private handleError(error: unknown): void {
+    const axiosError = error as {
+      response?: { data?: unknown };
+      message?: string;
+    };
     this.logger.error(
       'Mercado Pago API Error',
-      error.response?.data || error.message,
+      axiosError.response?.data || axiosError.message || 'Unknown error',
     );
-    if (error.response) {
+    if (axiosError.response) {
       throw new UnprocessableEntityException(
-        `Mercado Pago Error: ${JSON.stringify(error.response.data)}`,
+        `Mercado Pago Error: ${JSON.stringify(axiosError.response.data)}`,
       );
     }
     throw new BadGatewayException('Failed to communicate with Mercado Pago');

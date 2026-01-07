@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { NotFoundException } from '@nestjs/common';
 import { PaymentEntity } from '../../domain/payment.entity';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';

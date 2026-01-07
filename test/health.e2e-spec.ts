@@ -27,7 +27,6 @@ describe('HealthController (e2e)', () => {
   });
 
   it('/health (GET)', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return request(app.getHttpServer())
       .get('/health')
       .expect(200)
