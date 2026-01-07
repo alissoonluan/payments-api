@@ -32,6 +32,11 @@ jobs:
       MERCADOPAGO_BACK_URL_SUCCESS: http://test.com/success
       MERCADOPAGO_BACK_URL_FAILURE: http://test.com/failure
       MERCADOPAGO_BACK_URL_PENDING: http://test.com/pending
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: payments_db
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
 
     steps:
       - uses: actions/checkout@v4
