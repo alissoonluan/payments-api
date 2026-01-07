@@ -20,10 +20,18 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U admin -d payments_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://admin:admin@localhost:5432/payments_db?schema=public
+      MERCADOPAGO_ACCESS_TOKEN: test_token
+      MERCADOPAGO_NOTIFICATION_URL: http://test.com/webhook
+      MERCADOPAGO_BACK_URL_SUCCESS: http://test.com/success
+      MERCADOPAGO_BACK_URL_FAILURE: http://test.com/failure
+      MERCADOPAGO_BACK_URL_PENDING: http://test.com/pending
 
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +45,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Linters
-        run: npm run lint
-
       - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Linters
+        run: npm run lint
 
       - name: Build
         run: npm run build
 
       - name: Run unit tests
         run: npm run test
+
+      - name: Run E2E tests
+        run: npm run test:e2e

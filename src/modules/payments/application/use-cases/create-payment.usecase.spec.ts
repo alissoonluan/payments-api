@@ -4,6 +4,9 @@ import { PaymentsRepository } from '../ports/payments.repository';
 import { PaymentGateway } from '../ports/payment-gateway';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { PaymentEntity } from '../../domain/payment.entity';
+import { validateCPF } from '@shared/validators/is-cpf.validator';
+
+jest.mock('@shared/validators/is-cpf.validator');
 
 describe('CreatePaymentUseCase', () => {
   let useCase: CreatePaymentUseCase;
@@ -25,8 +28,9 @@ describe('CreatePaymentUseCase', () => {
     useCase = new CreatePaymentUseCase(repository, gateway);
   });
 
-
   it('should throw error for invalid CPF', async () => {
+    (validateCPF as jest.Mock).mockReturnValue(false);
+
     await expect(
       useCase.execute({
         amount: 100,
@@ -38,6 +42,8 @@ describe('CreatePaymentUseCase', () => {
   });
 
   it('should create a PIX payment without calling gateway', async () => {
+    (validateCPF as jest.Mock).mockReturnValue(true);
+
     const dto = {
       amount: 100,
       description: 'Test PIX',
@@ -63,6 +69,8 @@ describe('CreatePaymentUseCase', () => {
   });
 
   it('should create a CREDIT_CARD payment and call gateway', async () => {
+    (validateCPF as jest.Mock).mockReturnValue(true);
+
     const dto = {
       amount: 200,
       description: 'Test CC',
@@ -98,6 +106,8 @@ describe('CreatePaymentUseCase', () => {
   });
 
   it('should throw exception when gateway fails', async () => {
+    (validateCPF as jest.Mock).mockReturnValue(true);
+
     const dto = {
       amount: 200,
       description: 'Test Fail',
