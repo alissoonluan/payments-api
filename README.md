@@ -144,4 +144,5 @@ O projeto inclui configuração de CI (GitHub Actions) que executa a cada push:
 
 ---
 
-**Autor:** [Seu Nome/Candidato]
+**Autor:** [Alisson Luan]
+
