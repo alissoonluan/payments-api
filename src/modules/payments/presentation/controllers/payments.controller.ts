@@ -1,0 +1,62 @@
+import { Controller, Post, Body, Put, Param, Get, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { CreatePaymentUseCase } from '../../application/use-cases/create-payment.usecase';
+import { UpdatePaymentUseCase } from '../../application/use-cases/update-payment.usecase';
+import { GetPaymentUseCase } from '../../application/use-cases/get-payment.usecase';
+import { ListPaymentsUseCase } from '../../application/use-cases/list-payments.usecase';
+import { CreatePaymentDto } from '../../application/dtos/create-payment.dto';
+import { UpdatePaymentDto } from '../../application/dtos/update-payment.dto';
+import { ListPaymentsQueryDto } from '../../application/dtos/list-payments-query.dto';
+import { PaymentResponseDto } from '../../application/dtos/payment-response.dto';
+
+@ApiTags('Payments')
+@Controller('api/payment')
+export class PaymentsController {
+  constructor(
+    private readonly createPaymentUseCase: CreatePaymentUseCase,
+    private readonly updatePaymentUseCase: UpdatePaymentUseCase,
+    private readonly getPaymentUseCase: GetPaymentUseCase,
+    private readonly listPaymentsUseCase: ListPaymentsUseCase,
+  ) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new payment' })
+  @ApiResponse({ status: 201, type: PaymentResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({
+    status: 422,
+    description: 'Business validation failed (e.g. invalid CPF)',
+  })
+  async create(@Body() dto: CreatePaymentDto): Promise<PaymentResponseDto> {
+    return this.createPaymentUseCase.execute(dto);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update payment restricted fields' })
+  @ApiResponse({ status: 200, type: PaymentResponseDto })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  @ApiResponse({ status: 422, description: 'Invalid status transition' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePaymentDto,
+  ): Promise<PaymentResponseDto> {
+    return this.updatePaymentUseCase.execute(id, dto);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get payment by ID' })
+  @ApiResponse({ status: 200, type: PaymentResponseDto })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async getById(@Param('id') id: string): Promise<PaymentResponseDto> {
+    return this.getPaymentUseCase.execute(id);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List payments with filters' })
+  @ApiResponse({ status: 200, type: [PaymentResponseDto] })
+  async list(
+    @Query() query: ListPaymentsQueryDto,
+  ): Promise<PaymentResponseDto[]> {
+    return this.listPaymentsUseCase.execute(query);
+  }
+}
