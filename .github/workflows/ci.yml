@@ -104,7 +104,7 @@ jobs:
           sleep 2
 
       - name: E2E tests
-        run: npm run test:e2e
+        run: npm run test:e2e:run
 
       - name: Upload worker logs (if failure)
         if: failure()
