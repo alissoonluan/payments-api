@@ -72,9 +72,12 @@ sequenceDiagram
    ngrok http 3000
    ```
 
-   Update your `.env` with the generated ngrok URL:
+   Update your `.env` with your Mercado Pago Access Token and the generated ngrok URL:
 
    ```env
+   # Mercado Pago Credentials
+   MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-token-here
+
    # Webhook Notification (The most important for background updates)
    MERCADOPAGO_NOTIFICATION_URL=https://your-id.ngrok-free.app/api/webhooks/mercadopago
 
