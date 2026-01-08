@@ -1,14 +1,101 @@
 # 🏦 Payments API
 
-A robust, enterprise-grade payment orchestration service built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io**.
+A production-ready **payment orchestration service** built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io**.
 
-This project provides a highly resilient orchestrator for financial transactions, focusing specifically on **PIX** and **Credit Card** flows. It leverages **Temporal.io** to manage complex payment lifecycles, ensuring transactions are never lost even during service failures.
+This API is responsible for managing **PIX** and **Credit Card** payment lifecycles with strong guarantees of **consistency**, **idempotency**, and **resilience**.  
+Long-running payment processes are orchestrated using **Temporal.io**, ensuring that no transaction is lost even in the presence of failures, retries, or service restarts.
 
 ---
 
-## 🏗️ Architecture Overview
+## 🎯 Problem This Project Solves
 
-The project follows **Clean Architecture** principles, ensuring that the business logic (Domain & Application) is decoupled from infrastructure concerns (API, Database, External Gateways).
+Payment systems operate in an unreliable environment:
+
+- External gateways may be slow or unavailable
+- Webhooks can be delayed, duplicated, or arrive out of order
+- Services may crash mid-transaction
+- User flows span minutes or hours, not milliseconds
+
+This project addresses these challenges by combining:
+
+- Explicit business use cases
+- Infrastructure-agnostic domain logic
+- Deterministic orchestration with Temporal
+- Strict webhook idempotency
+
+---
+
+## 🧱 Architectural Design
+
+This project adopts a **Clean, Modular, Use-Case-Driven Architecture**, inspired by:
+
+- Clean Architecture
+- Ports & Adapters (Hexagonal Architecture)
+- Explicit Application Use Cases
+- Eventual Consistency with Workflow Orchestration
+
+The architecture is expressed **directly through the folder structure**, not only by documentation.
+
+---
+
+## 📦 Module Structure
+
+All business logic related to payments lives under:
+
+```
+src/modules/payments
+```
+
+Each subfolder has a **single, clear responsibility**.
+
+---
+
+### 🟦 domain/ — Business Rules
+
+- Pure business concepts
+- No framework, database, or HTTP dependencies
+- Represents the ubiquitous language of the payment domain
+
+---
+
+### 🟨 application/ — Application Use Cases
+
+Defines what the system does.
+
+- One use case per business action
+- Fully isolated from infrastructure
+- Unit-test friendly
+
+---
+
+### 🟥 infra/ — Infrastructure Adapters
+
+Contains technical implementations:
+
+- Prisma repositories
+- Mercado Pago gateway
+- Persistence mappers
+
+Can be replaced without impacting business rules.
+
+---
+
+### 🟪 presentation/ — API Layer
+
+- HTTP controllers
+- DTO validation
+- Request/response mapping
+- No business logic
+
+---
+
+### ⏱ temporal/ — Workflow Orchestration
+
+- Long-running processes
+- Deterministic workflows
+- Activities delegate to application use cases
+
+---
 
 ### 🔄 System Flow (Credit Card)
 
@@ -218,4 +305,5 @@ _Expected Status: `PAID`._
 ---
 
 **Payments API** | Made with ❤️ by Alisson Luan
+
 
