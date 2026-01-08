@@ -310,18 +310,36 @@ npx prisma generate            # Regenerate client
 
 ---
 
+## Full End‑to‑End Flow
+
+1. **Create Payment** – Client calls `POST /api/payments` with `paymentMethod` set to `CREDIT_CARD` (or `PIX`). The API returns a `mpInitPoint` URL (Mercado Pago checkout) and the internal `payment.id` as `mpExternalReference`.
+2. **Redirect to Mercado Pago** – The client opens the `mpInitPoint` URL. After the buyer completes the checkout, Mercado Pago redirects the user to one of the URLs configured in the environment:
+   - `MERCADOPAGO_SUCCESS_URL` – payment approved.
+   - `MERCADOPAGO_FAILURE_URL` – payment rejected.
+   - `MERCADOPAGO_PENDING_URL` – payment pending (e.g., awaiting bank confirmation).
+3. **Webhook Notification** – Regardless of the UI outcome, Mercado Pago sends a webhook (`type: "payment"`) to the URL defined by `MERCADOPAGO_NOTIFICATION_URL`. The payload contains the Mercado Pago payment ID.
+4. **Webhook Processing** – The API receives the webhook, checks idempotency, fetches the payment details from Mercado Pago, maps the status to our domain (`PAID`, `FAIL`, etc.) and updates the `Payment` record. If the payment is a credit‑card flow, the webhook also **signals** the running Temporal workflow with the result.
+5. **Temporal Workflow** – The workflow, started at step 1, waits for the signal. If the signal arrives, it completes the workflow with the final status. If the signal does not arrive within `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES`, the workflow falls back to polling Mercado Pago (up to 3 attempts) and finally marks the payment as `FAIL` with `failReason: "timeout_waiting_confirmation"`.
+6. **Final Status** – The client can query `GET /api/payments/{id}` to see the final status (`PAID`, `FAIL`, etc.) and the `mpPaymentId` assigned by Mercado Pago.
+
+---
+
 ## Environment Variables
 
-| Variable                                | Description                   | Default          |
-| --------------------------------------- | ----------------------------- | ---------------- |
-| `PORT`                                  | API port                      | `3000`           |
-| `DATABASE_URL`                          | PostgreSQL connection string  | -                |
-| `MERCADOPAGO_ACCESS_TOKEN`              | Mercado Pago access token     | -                |
-| `TEMPORAL_ENABLED`                      | Enable Temporal               | `true`           |
-| `TEMPORAL_ADDRESS`                      | Temporal Server address       | `localhost:7233` |
-| `TEMPORAL_TASK_QUEUE`                   | Task queue name               | `payments-queue` |
-| `TEMPORAL_MOCK_MP`                      | Mock Mercado Pago in Temporal | `false`          |
-| `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES` | Signal timeout                | `10`             |
+| Variable                                | Description                               | Default                                          |
+| --------------------------------------- | ----------------------------------------- | ------------------------------------------------ |
+| `PORT`                                  | API port                                  | `3000`                                           |
+| `DATABASE_URL`                          | PostgreSQL connection string              | -                                                |
+| `MERCADOPAGO_ACCESS_TOKEN`              | Mercado Pago access token                 | -                                                |
+| `MERCADOPAGO_NOTIFICATION_URL`          | URL where Mercado Pago will POST webhooks | `http://localhost:3000/api/webhooks/mercadopago` |
+| `MERCADOPAGO_SUCCESS_URL`               | URL for successful checkout redirects     | `http://localhost:3000/api/mercadopago/success`  |
+| `MERCADOPAGO_FAILURE_URL`               | URL for failed checkout redirects         | `http://localhost:3000/api/mercadopago/failure`  |
+| `MERCADOPAGO_PENDING_URL`               | URL for pending checkout redirects        | `http://localhost:3000/api/mercadopago/pending`  |
+| `TEMPORAL_ENABLED`                      | Enable Temporal integration               | `true`                                           |
+| `TEMPORAL_ADDRESS`                      | Temporal Server address                   | `localhost:7233`                                 |
+| `TEMPORAL_TASK_QUEUE`                   | Task queue name                           | `payments-queue`                                 |
+| `TEMPORAL_MOCK_MP`                      | Mock Mercado Pago in Temporal             | `false`                                          |
+| `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES` | Signal timeout (minutes)                  | `10`                                             |
 
 ---
 
