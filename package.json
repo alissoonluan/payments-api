@@ -18,7 +18,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "npx jest --config ./test/jest-e2e.json --runInBand",
+    "test:e2e": "npx jest \"test/**/*.e2e-spec.ts\" --runInBand",
     "test:e2e:run": "npm run test:e2e:db:up && npm run test:e2e:db:migrate && npm run test:e2e",
     "test:e2e:db:up": "docker-compose -f docker-compose.test.yml up -d && npm run test:e2e:db:wait",
     "test:e2e:db:wait": "node -e \"const exec = require('child_process').exec; let attempts = 0; const check = () => { exec('docker exec payments_postgres_test pg_isready -U postgres -d payments_test', (err) => { if (err && attempts++ < 30) { setTimeout(check, 1000); } else if (err) { console.error('Database not ready'); process.exit(1); } else { console.log('Database ready'); } }); }; check();\"",

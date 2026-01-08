@@ -2,76 +2,113 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: admin
-          POSTGRES_DB: payments_db
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: payments_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U admin -d payments_db"
+          --health-cmd "pg_isready -U test -d payments_test"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+
+      temporal-postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: temporal
+          POSTGRES_PASSWORD: temporal
+          POSTGRES_DB: temporal
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U temporal -d temporal"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      temporal:
+        image: temporalio/auto-setup:1.24.2
+        env:
+          DB: postgres12
+          DB_PORT: 5432
+          POSTGRES_USER: temporal
+          POSTGRES_PWD: temporal
+          POSTGRES_SEEDS: temporal-postgres
+        ports:
+          - 7233:7233
 
     env:
-      DATABASE_URL: postgresql://admin:admin@localhost:5432/payments_db?schema=public
-      MERCADOPAGO_ACCESS_TOKEN: test_token
-      MERCADOPAGO_NOTIFICATION_URL: http://notify
-      MERCADOPAGO_BASE_URL: http://localhost:3001
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: payments_db
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
+      NODE_ENV: test
+      DATABASE_URL: postgresql://test:test@localhost:5432/payments_test?schema=public
+      TEMPORAL_ADDRESS: localhost:7233
+      TEMPORAL_TASK_QUEUE: payments-queue
+      WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES: 1
+      MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24.x'
+          node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install
         run: npm ci
 
-      - name: Wait Postgres
+      - name: Wait for DB
         run: |
           for i in {1..30}; do
-            pg_isready -h localhost -p 5432 -U admin -d payments_db && exit 0
+            pg_isready -h localhost -p 5432 -U test -d payments_test && break
             sleep 1
           done
-          exit 1
-        env:
-          PGPASSWORD: admin
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
+      - name: Prisma generate
+        run: npm run prisma:generate
 
-      - name: Apply migrations
-        run: npx prisma migrate deploy
+      - name: Prisma migrate
+        run: npm run prisma:migrate:deploy
 
-      - name: Linters
+      - name: Wait for Temporal
+        run: |
+          for i in {1..60}; do
+            (echo > /dev/tcp/localhost/7233) >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+      - name: Lint
         run: npm run lint
 
-      - name: Build
-        run: npm run build
+      - name: Unit tests
+        run: npm run test:unit
 
-      - name: Run unit tests
-        run: npm run test
+      # Opcional: subir worker durante o e2e, se o seu e2e depender do workflow rodando
+      - name: Start Temporal worker (background)
+        run: |
+          nohup npm run temporal:worker > worker.log 2>&1 &
+          sleep 2
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      - name: E2E tests
+        run: npm run test:e2e:run
+
+      - name: Upload worker logs (if failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporal-worker-logs
+          path: worker.log
