@@ -217,4 +217,5 @@ _Expected Status: `PAID`._
 
 ---
 
-**Payments API** | _Developed for Senior-level Technical Evaluation_
+**Payments API** | Made with ❤️ by Alisson Luan
+
