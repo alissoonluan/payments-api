@@ -154,13 +154,25 @@ curl -X POST http://localhost:3000/api/payments \
   }'
 ```
 
-_Take note of the `id` and `mpExternalReference` returned._
+### 2. Complete the Payment (Real Flow)
 
-### 2. Monitor the Orchestration
+The previous request returns an `mpSandboxInitPoint` (or `mpInitPoint`).
 
-Visite the **Temporal UI** (`http://localhost:8080`). You will see a workflow named `payment-<externalReference>` in `Running` state. It is currently waiting for the payment signal.
+- **Open the URL** in your browser.
+- **Complete the checkout** on the Mercado Pago page.
+- Once finished, Mercado Pago will automatically call your webhook (if ngrok is running and configured), and the Temporal workflow will finalize the status to `PAID`.
 
-### 3. Simulate Mercado Pago Webhook
+---
+
+### 3. Monitor the Orchestration
+
+Visit the **Temporal UI** (`http://localhost:8080`). You will see a workflow named `payment-<externalReference>` in `Running` state. If you followed the real flow above, you will see it transition to `Completed` automatically after the payment.
+
+---
+
+### 4. Simulate Mercado Pago Webhook (Shortcut)
+
+If you are **not** using ngrok or don't want to perform the real checkout, you can simulate the webhook call manually:
 
 ```bash
 curl -X POST http://localhost:3000/api/webhooks/mercadopago \
@@ -171,7 +183,9 @@ curl -X POST http://localhost:3000/api/webhooks/mercadopago \
   }'
 ```
 
-### 4. Verify Final State
+---
+
+### 5. Verify Final State
 
 ```bash
 curl http://localhost:3000/api/payments/<id>
