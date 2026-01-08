@@ -106,7 +106,6 @@ describe('PaymentsController (e2e)', () => {
       .expect(200);
 
     expect(getRes.body.status).toBe(PaymentStatus.PAID);
-    // Temporal disabled, so no signal sent
     expect(mockWorkflowPort.signalPaymentResult).not.toHaveBeenCalled();
   });
 

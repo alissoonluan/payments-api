@@ -97,7 +97,6 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
-      # Opcional: subir worker durante o e2e, se o seu e2e depender do workflow rodando
       - name: Start Temporal worker (background)
         run: |
           nohup npm run temporal:worker > worker.log 2>&1 &
