@@ -14,11 +14,13 @@ export class E2ETestDatabaseHelper {
       );
     }
 
-    const pool = new Pool({ connectionString: datasourceUrl });
-    const adapter = new PrismaPg(pool);
+    this.pool = new Pool({ connectionString: datasourceUrl });
+    const adapter = new PrismaPg(this.pool);
 
     this.prisma = new PrismaClient({ adapter } as any);
   }
+
+  private pool: Pool;
 
   /**
    * Connect to database
@@ -32,6 +34,7 @@ export class E2ETestDatabaseHelper {
    */
   async disconnect(): Promise<void> {
     await this.prisma.$disconnect();
+    await this.pool.end();
   }
 
   /**

@@ -59,6 +59,10 @@ export class PaymentPrismaMapper {
       updateData.status = entity.status;
     }
 
+    if (entity.mpExternalReference !== undefined) {
+      updateData.mpExternalReference = entity.mpExternalReference;
+    }
+
     if (entity.mpPreferenceId !== undefined) {
       updateData.mpPreferenceId = entity.mpPreferenceId;
     }

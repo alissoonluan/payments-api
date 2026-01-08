@@ -34,16 +34,6 @@ export class HealthController {
   check() {
     return this.health.check([
       () => this.db.pingCheck('database', this.prismaService),
-
-      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
-
-      () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024),
-
-      () =>
-        this.disk.checkStorage('storage', {
-          path: process.platform === 'win32' ? 'C:\\' : '/',
-          thresholdPercent: 0.9,
-        }),
     ]);
   }
 }

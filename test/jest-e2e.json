@@ -10,9 +10,9 @@
     "/node_modules/(?!(uuid)/)"
   ],
     "moduleNameMapper": {
-      "^@modules/(.*)$": "<rootDir>/src/modules/$1",
-      "^@shared/(.*)$": "<rootDir>/src/shared/$1",
-      "^@infra/(.*)$": "<rootDir>/src/infra/$1",
+      "^@modules/(.*)$": "<rootDir>/../src/modules/$1",
+      "^@shared/(.*)$": "<rootDir>/../src/shared/$1",
+      "^@infra/(.*)$": "<rootDir>/../src/infra/$1",
       "^uuid$": "uuid"
     },
   "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"]

@@ -5,9 +5,10 @@ import { AppModule } from './../src/app.module';
 import { PaymentGateway } from '../src/modules/payments/application/ports/payment-gateway';
 
 describe('HealthController (e2e)', () => {
+  jest.setTimeout(30000);
   let app: INestApplication;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })

@@ -3,6 +3,7 @@ import { PaymentStatus } from './payment.enums';
 export interface PaymentWorkflowInput {
   paymentId: string;
   externalReference: string;
+  timeoutMinutes?: number;
 }
 
 export interface MercadoPagoResultSignal {

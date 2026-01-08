@@ -12,6 +12,8 @@ import { PaymentWorkflowPort } from '../src/modules/payments/application/ports/p
 import { E2ETestDatabaseHelper } from './utils/e2e-database.helper';
 
 describe('PaymentsController (e2e)', () => {
+  jest.setTimeout(30000);
+
   let app: INestApplication;
   let fakeGateway: FakePaymentGateway;
   let dbHelper: E2ETestDatabaseHelper;

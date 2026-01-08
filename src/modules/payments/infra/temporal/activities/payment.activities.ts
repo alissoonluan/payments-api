@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Context } from '@temporalio/activity';
+import { ApplicationFailure } from '@temporalio/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentsRepository } from '@modules/payments/application/ports/payments.repository';
 import { PaymentGateway } from '@modules/payments/application/ports/payment-gateway';
 import { PaymentStatus } from '@modules/payments/domain/payment.enums';
 import { AppLoggerService } from '@shared/logger/app-logger.service';
+
+const FAILURE_TYPES = {
+  PAYMENT_NOT_FOUND: 'PAYMENT_NOT_FOUND',
+  PAYMENT_NOT_PENDING: 'PAYMENT_NOT_PENDING',
+  PAYMENT_UPDATE_NOT_FOUND: 'PAYMENT_UPDATE_NOT_FOUND',
+  MP_PREFERENCE_FAILED: 'MP_PREFERENCE_FAILED',
+} as const;
 
 @Injectable()
 export class PaymentActivities {
@@ -23,19 +31,29 @@ export class PaymentActivities {
 
   async ensurePaymentIsPending(paymentId: string): Promise<void> {
     const payment = await this.paymentsRepository.findById(paymentId);
+
     if (!payment) {
-      this.logActivity(`Payment not found: ${paymentId}`);
-      throw new NotFoundException(`Payment ${paymentId} not found`);
+      this.logActivity(`Payment not found: ${paymentId}`, { paymentId });
+      throw ApplicationFailure.nonRetryable(
+        `Payment ${paymentId} not found`,
+        FAILURE_TYPES.PAYMENT_NOT_FOUND,
+        { paymentId },
+      );
     }
+
     if (payment.status !== PaymentStatus.PENDING) {
-      this.logActivity(
-        `Payment is not in PENDING status (current: ${payment.status})`,
+      this.logActivity(`Payment not pending (current: ${payment.status})`, {
+        paymentId,
+        currentStatus: payment.status,
+      });
+
+      throw ApplicationFailure.nonRetryable(
+        `Payment ${paymentId} is not PENDING (current: ${payment.status})`,
+        FAILURE_TYPES.PAYMENT_NOT_PENDING,
         { paymentId, currentStatus: payment.status },
       );
-      throw new Error(
-        `Payment ${paymentId} is not in PENDING status (current: ${payment.status})`,
-      );
     }
+
     this.logActivity('Payment validated as PENDING', { paymentId });
   }
 
@@ -48,12 +66,7 @@ export class PaymentActivities {
       this.configService.get<string>('TEMPORAL_MOCK_MP') === 'true';
 
     if (isMock) {
-      this.logActivity(
-        'Using MOCK Mercado Pago preference (TEMPORAL_MOCK_MP=true)',
-        {
-          paymentId,
-        },
-      );
+      this.logActivity('Using MOCK Mercado Pago preference', { paymentId });
       return {
         preferenceId: `mock-pref-${paymentId}`,
         initPoint: 'https://www.mercadopago.com.br/checkout/mock',
@@ -63,15 +76,19 @@ export class PaymentActivities {
 
     const payment = await this.paymentsRepository.findById(paymentId);
     if (!payment) {
-      this.logActivity(
-        `Payment not found during preference creation: ${paymentId}`,
+      this.logActivity(`Payment not found during preference creation`, {
+        paymentId,
+      });
+      throw ApplicationFailure.nonRetryable(
+        `Payment ${paymentId} not found`,
+        FAILURE_TYPES.PAYMENT_NOT_FOUND,
+        { paymentId },
       );
-      throw new NotFoundException(`Payment ${paymentId} not found`);
     }
 
     try {
       const result = await this.paymentGateway.createPreference(payment);
-      this.logActivity('Mercado Pago preference created successfully', {
+      this.logActivity('Mercado Pago preference created', {
         paymentId,
         preferenceId: result.preferenceId,
       });
@@ -81,7 +98,12 @@ export class PaymentActivities {
         paymentId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw error;
+
+      throw ApplicationFailure.nonRetryable(
+        `Failed to create Mercado Pago preference`,
+        FAILURE_TYPES.MP_PREFERENCE_FAILED,
+        { paymentId },
+      );
     }
   }
 
@@ -89,12 +111,13 @@ export class PaymentActivities {
     paymentId: string,
     data: { preferenceId: string; initPoint: string; sandboxInitPoint: string },
   ): Promise<void> {
-    await this.paymentsRepository.update(paymentId, {
+    await this.safeUpdate(paymentId, {
       mpPreferenceId: data.preferenceId,
       mpInitPoint: data.initPoint,
       mpSandboxInitPoint: data.sandboxInitPoint,
     });
-    this.logActivity('Correlation data saved to database', {
+
+    this.logActivity('Correlation data saved', {
       paymentId,
       preferenceId: data.preferenceId,
     });
@@ -105,10 +128,8 @@ export class PaymentActivities {
     status: PaymentStatus,
     failReason?: string,
   ): Promise<void> {
-    await this.paymentsRepository.update(paymentId, {
-      status,
-      failReason,
-    });
+    await this.safeUpdate(paymentId, { status, failReason });
+
     this.logActivity(`Payment status updated to ${status}`, {
       paymentId,
       status,
@@ -119,7 +140,6 @@ export class PaymentActivities {
   async getMercadoPagoStatus(paymentId: string): Promise<PaymentStatus | null> {
     const isMock =
       this.configService.get<string>('TEMPORAL_MOCK_MP') === 'true';
-
     if (isMock) {
       this.logActivity('Polling MOCK status (returning PAID)', { paymentId });
       return PaymentStatus.PAID;
@@ -135,5 +155,25 @@ export class PaymentActivities {
 
     this.logActivity('Polling payment status from database', { paymentId });
     return payment.status;
+  }
+
+  private async safeUpdate(paymentId: string, data: any): Promise<void> {
+    try {
+      await this.paymentsRepository.update(paymentId, data);
+    } catch (error: any) {
+      // ✅ if Prisma throws P2025 (record not found), swallow and mark non-retryable
+      const msg = String(error?.message || '');
+      const code = String(error?.code || '');
+
+      if (
+        code === 'P2025' ||
+        msg.toLowerCase().includes('record to update not found')
+      ) {
+        this.logActivity('Update ignored: payment not found', { paymentId });
+        return;
+      }
+
+      throw error;
+    }
   }
 }

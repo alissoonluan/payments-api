@@ -5,6 +5,7 @@ import {
   condition,
   sleep,
   log,
+  ApplicationFailure,
 } from '@temporalio/workflow';
 import type { PaymentActivities } from '../activities/payment.activities';
 import {
@@ -29,6 +30,20 @@ const {
     maximumAttempts: 3,
   },
 });
+
+function getFailureType(err: unknown): string | undefined {
+  if (err instanceof ApplicationFailure) {
+    const type = err.type;
+    return typeof type === 'string' ? type : undefined;
+  }
+
+  if (err && typeof err === 'object' && 'type' in err) {
+    const type = (err as Record<string, unknown>).type;
+    return typeof type === 'string' ? type : undefined;
+  }
+
+  return undefined;
+}
 
 export async function creditCardPaymentWorkflow(
   input: PaymentWorkflowInput,
@@ -58,9 +73,19 @@ export async function creditCardPaymentWorkflow(
       `[WORKFLOW] code=PAYMENT_VALIDATED workflowId=${workflowId} message="Payment is in PENDING status"`,
     );
   } catch (error) {
+    const type = getFailureType(error);
+
     log.error(
-      `[WORKFLOW] code=PAYMENT_VALIDATION_FAILED workflowId=${workflowId} message="Payment validation failed: ${error}"`,
+      `[WORKFLOW] code=PAYMENT_VALIDATION_FAILED workflowId=${workflowId} type=${type || 'UNKNOWN'} message="${String(error)}"`,
     );
+
+    if (type === 'PAYMENT_NOT_FOUND') {
+      log.info(
+        `[WORKFLOW] code=WORKFLOW_COMPLETED workflowId=${workflowId} status=FAIL reason=payment_not_found`,
+      );
+      return;
+    }
+
     await updatePaymentStatus(
       input.paymentId,
       PaymentStatus.FAIL,
@@ -97,10 +122,7 @@ export async function creditCardPaymentWorkflow(
     return;
   }
 
-  const timeoutMinutes = parseInt(
-    process.env.WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES || '10',
-    10,
-  );
+  const timeoutMinutes = input.timeoutMinutes || 10;
   log.info(
     `[WORKFLOW] code=WAITING_CONFIRMATION workflowId=${workflowId} timeoutMinutes=${timeoutMinutes} message="Waiting for payment confirmation signal"`,
   );

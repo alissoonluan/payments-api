@@ -64,6 +64,12 @@ export class TemporalClientService implements OnModuleInit, OnModuleDestroy {
     const taskQueue =
       this.configService.get<string>('TEMPORAL_TASK_QUEUE') ?? 'payments-queue';
 
+    const timeoutMinutes = parseInt(
+      this.configService.get<string>('WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES') ??
+        '10',
+      10,
+    );
+
     const workflowId = `payment-${data.externalReference}`;
 
     this.logger.log(
@@ -73,7 +79,12 @@ export class TemporalClientService implements OnModuleInit, OnModuleDestroy {
     const handle = await this.getWorkflowClient().start(
       creditCardPaymentWorkflow,
       {
-        args: [data],
+        args: [
+          {
+            ...data,
+            timeoutMinutes,
+          },
+        ],
         taskQueue,
         workflowId,
       },
