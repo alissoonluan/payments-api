@@ -1,133 +1,136 @@
-# 💳 Payments API - Production-Ready Payment Orchestration
+# Payments API
 
-API de pagamentos profissional com **NestJS**, **PostgreSQL**, **Mercado Pago** e **Temporal.io** para orquestração robusta de workflows de pagamento.
+A production-ready payment orchestration API built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io** for robust workflow management.
 
 ---
 
-## 🏗️ Arquitetura
+## Architecture
 
-### Clean Architecture
+### Clean Architecture Principles
 
-- **Domain**: Entidades e enums de negócio (`PaymentEntity`, `PaymentStatus`, `PaymentMethod`)
-- **Application**: Use Cases, DTOs e Ports (interfaces)
-- **Infrastructure**: Implementações concretas (Prisma, Mercado Pago, Temporal)
+This project follows Clean Architecture to ensure maintainability, testability, and independence from frameworks:
 
-### Stack Tecnológico
+- **Domain Layer**: Framework-agnostic business entities and enums (`PaymentEntity`, `PaymentStatus`, `PaymentMethod`)
+- **Application Layer**: Use cases, DTOs, and port interfaces (repository and gateway contracts)
+- **Infrastructure Layer**: Concrete implementations (Prisma ORM, Mercado Pago client, Temporal.io integration)
+- **Presentation Layer**: HTTP controllers and API contracts (REST endpoints, Swagger documentation)
 
-- **Backend**: NestJS 11 + TypeScript
+### Technology Stack
+
+- **Backend Framework**: NestJS 11 + TypeScript
 - **Database**: PostgreSQL 15 + Prisma ORM
 - **Payment Gateway**: Mercado Pago (Checkout Pro)
-- **Workflow Engine**: Temporal.io
+- **Workflow Orchestration**: Temporal.io
 - **Containerization**: Docker + Docker Compose
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### Pré-requisitos
+### Prerequisites
 
-- Docker e Docker Compose
-- Node.js 20+ (opcional, para desenvolvimento local)
+- Docker and Docker Compose
+- Node.js 20+ (optional, for local development)
 
-### 1. Configuração
+### 1. Configuration
 
 ```bash
 cp .env.example .env
 ```
 
-**Importante**: Configure seu `MERCADOPAGO_ACCESS_TOKEN` com um token de teste do [Mercado Pago Developers](https://www.mercadopago.com.br/developers).
+**Important**: Configure your `MERCADOPAGO_ACCESS_TOKEN` with a test token from [Mercado Pago Developers](https://www.mercadopago.com.br/developers).
 
-### 2. Iniciar Infraestrutura Completa
+### 2. Start Complete Infrastructure
 
 ```bash
 docker-compose up -d --build
 ```
 
-Este comando sobe:
+This command starts:
 
-- ✅ PostgreSQL (porta 5432) - Banco da aplicação
-- ✅ Temporal PostgreSQL (porta 5433) - Banco do Temporal
-- ✅ Temporal Server (porta 7233)
-- ✅ Temporal UI (porta 8080) - Interface web
-- ✅ API NestJS (porta 3000)
-- ✅ Temporal Worker - Processa workflows
+- ✅ PostgreSQL (port 5432) - Application database
+- ✅ Temporal PostgreSQL (port 5433) - Temporal database
+- ✅ Temporal Server (port 7233)
+- ✅ Temporal UI (port 8080) - Web interface
+- ✅ NestJS API (port 3000)
+- ✅ Temporal Worker - Processes workflows
 
-### 3. Verificar Saúde
+### 3. Health Check
 
 ```bash
 curl http://localhost:3000/health
 ```
 
-Acesse a documentação Swagger: **http://localhost:3000/api/docs**
+Access Swagger documentation: **http://localhost:3000/api/docs**
 
 ---
 
-## 📋 Fluxos de Pagamento
+## Payment Flows
 
-### PIX (Simples)
+### PIX (Simple Flow)
 
-1. Cliente cria pagamento via `POST /api/payments`
-2. Sistema retorna status `PENDING`
-3. Cliente efetua pagamento (fora do escopo)
-4. Webhook atualiza status para `PAID`
+1. Client creates payment via `POST /api/payments`
+2. System returns status `PENDING`
+3. Client completes payment (external to this system)
+4. Webhook updates status to `PAID`
 
-### CREDIT_CARD (Orquestrado por Temporal)
+### CREDIT_CARD (Temporal Orchestrated)
 
-1. **Criação**: `POST /api/payments` com `paymentMethod: CREDIT_CARD`
-2. **Workflow Iniciado**: Temporal cria workflow `payment-{id}`
-3. **Preference MP**: Activity cria checkout no Mercado Pago
-4. **Aguarda Confirmação**:
-   - **Webhook** → Signal do Temporal (caminho feliz)
-   - **Timeout** → Polling fallback (3 tentativas)
-5. **Finalização**: Status atualizado para `PAID` ou `FAIL`
+1. **Creation**: `POST /api/payments` with `paymentMethod: CREDIT_CARD`
+2. **Workflow Started**: Temporal creates workflow `payment-{id}`
+3. **Mercado Pago Preference**: Activity creates checkout preference
+4. **Awaiting Confirmation**:
+   - **Webhook** → Temporal signal (happy path)
+   - **Timeout** → Polling fallback (3 attempts)
+5. **Completion**: Status updated to `PAID` or `FAIL`
 
 ---
 
-## 🧪 Como Testar
+## Testing
 
-### Testes Automatizados
+### Automated Tests
 
-#### Testes Unitários
+#### Unit Tests
 
 ```bash
 npm run test:unit
 ```
 
-Cobre:
+Coverage:
 
-- ✅ CreatePaymentUseCase (PIX e CREDIT_CARD)
-- ✅ ProcessMercadoPagoWebhookUseCase (idempotência, sinais)
-- ✅ MercadoPagoWebhookService (parsing robusto)
+- ✅ CreatePaymentUseCase (PIX and CREDIT_CARD)
+- ✅ ProcessMercadoPagoWebhookUseCase (idempotency, signals)
+- ✅ MercadoPagoWebhookService (robust parsing)
 - ✅ PaymentActivities (Temporal)
 
-#### Testes E2E
+#### E2E Tests
 
 ```bash
 npm run test:e2e:run
 ```
 
-Sobe banco isolado e valida:
+Validates:
 
-- ✅ POST /api/payments (PIX e CREDIT_CARD)
+- ✅ POST /api/payments (PIX and CREDIT_CARD)
 - ✅ POST /api/webhooks/mercadopago
-- ✅ Validações (CPF, amount)
+- ✅ Input validations (CPF, amount)
 
-### Teste Manual Ponta-a-Ponta
+### Manual End-to-End Testing
 
-#### 1. Criar Pagamento CREDIT_CARD
+#### 1. Create CREDIT_CARD Payment
 
 ```bash
 curl -X POST http://localhost:3000/api/payments \
   -H "Content-Type: application/json" \
   -d '{
     "amount": 150.00,
-    "description": "Teste Técnico Sênior",
+    "description": "Production Test",
     "payerCpf": "11144477735",
     "paymentMethod": "CREDIT_CARD"
   }'
 ```
 
-**Resposta esperada**:
+**Expected Response**:
 
 ```json
 {
@@ -138,14 +141,14 @@ curl -X POST http://localhost:3000/api/payments \
 }
 ```
 
-#### 2. Verificar Workflow no Temporal UI
+#### 2. Verify Workflow in Temporal UI
 
-1. Acesse: **http://localhost:8080**
-2. Busque por `payment-abc-123`
-3. Status deve ser **Running**
-4. Veja os logs estruturados em cada Activity
+1. Access: **http://localhost:8080**
+2. Search for `payment-abc-123`
+3. Status should be **Running**
+4. View structured logs in each Activity
 
-#### 3. Simular Pagamento Aprovado (Webhook)
+#### 3. Simulate Approved Payment (Webhook)
 
 ```bash
 curl -X POST "http://localhost:3000/api/webhooks/mercadopago?data.id=mp-test-123&type=payment" \
@@ -153,7 +156,7 @@ curl -X POST "http://localhost:3000/api/webhooks/mercadopago?data.id=mp-test-123
   -d '{"action": "payment.created", "data": {"id": "mp-test-123"}}'
 ```
 
-**Nota**: Configure o mock do gateway para retornar:
+**Note**: Configure gateway mock to return:
 
 ```typescript
 {
@@ -162,13 +165,13 @@ curl -X POST "http://localhost:3000/api/webhooks/mercadopago?data.id=mp-test-123
 }
 ```
 
-#### 4. Verificar Status Final
+#### 4. Verify Final Status
 
 ```bash
 curl http://localhost:3000/api/payments/abc-123
 ```
 
-**Resposta esperada**:
+**Expected Response**:
 
 ```json
 {
@@ -178,42 +181,42 @@ curl http://localhost:3000/api/payments/abc-123
 }
 ```
 
-#### 5. Confirmar Workflow Completo
+#### 5. Confirm Workflow Completion
 
-No Temporal UI, o workflow `payment-abc-123` deve estar **Completed** com status `PAID`.
+In Temporal UI, workflow `payment-abc-123` should be **Completed** with status `PAID`.
 
 ---
 
-## 🔥 Cenários de Erro (Workflow Robusto)
+## Error Scenarios (Robust Workflow)
 
-### 1. Falha ao Criar Preference no Mercado Pago
+### 1. Mercado Pago Preference Creation Failure
 
-**Simular**: Remova/invalide `MERCADOPAGO_ACCESS_TOKEN`
+**Simulate**: Remove/invalidate `MERCADOPAGO_ACCESS_TOKEN`
 
-**Resultado**:
+**Result**:
 
-- Activity `createMercadoPagoPreference` falha
-- Workflow atualiza payment para `FAIL` com `failReason: "mp_preference_creation_failed"`
-- Workflow finaliza como **Completed** (não Failed)
+- Activity `createMercadoPagoPreference` fails
+- Workflow updates payment to `FAIL` with `failReason: "mp_preference_creation_failed"`
+- Workflow completes as **Completed** (not Failed)
 
-**Logs esperados**:
+**Expected Logs**:
 
 ```
 [WORKFLOW] code=MP_PREFERENCE_FAILED
 [WORKFLOW] code=WORKFLOW_COMPLETED status=FAIL reason=mp_preference_creation_failed
 ```
 
-### 2. Timeout Aguardando Confirmação
+### 2. Timeout Awaiting Confirmation
 
-**Simular**: Reduza `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES=1` e não envie webhook
+**Simulate**: Set `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES=1` and don't send webhook
 
-**Resultado**:
+**Result**:
 
-- Workflow aguarda 1 minuto
-- Inicia polling fallback (3 tentativas de 1 minuto cada)
-- Se nenhum status final, marca `FAIL` com `failReason: "timeout_waiting_confirmation"`
+- Workflow waits 1 minute
+- Starts polling fallback (3 attempts of 1 minute each)
+- If no final status, marks `FAIL` with `failReason: "timeout_waiting_confirmation"`
 
-**Logs esperados**:
+**Expected Logs**:
 
 ```
 [WORKFLOW] code=SIGNAL_TIMEOUT
@@ -222,163 +225,143 @@ No Temporal UI, o workflow `payment-abc-123` deve estar **Completed** com status
 [WORKFLOW] code=WORKFLOW_COMPLETED status=FAIL reason=timeout_waiting_confirmation
 ```
 
-### 3. Pagamento Rejeitado pelo Mercado Pago
+### 3. Payment Rejected by Mercado Pago
 
-**Simular**: Configure mock para retornar `status: 'rejected'`
+**Simulate**: Configure mock to return `status: 'rejected'`
 
-**Resultado**:
+**Result**:
 
-- Webhook mapeia para `PaymentStatus.FAIL`
-- Signal enviado ao workflow com status `FAIL`
-- Payment atualizado com `failReason: "mp_status_rejected"`
+- Webhook maps to `PaymentStatus.FAIL`
+- Signal sent to workflow with status `FAIL`
+- Payment updated with `failReason: "mp_status_rejected"`
 
-### 4. Webhook Duplicado (Idempotência)
+### 4. Duplicate Webhook (Idempotency)
 
-**Simular**: Envie o mesmo webhook 2x
+**Simulate**: Send same webhook twice
 
-**Resultado**:
+**Result**:
 
-- Primeira chamada: processa normalmente
-- Segunda chamada: log `WEBHOOK_DUPLICATE` e retorna `200 OK` sem processar
+- First call: processes normally
+- Second call: log `WEBHOOK_DUPLICATE` and returns `200 OK` without processing
 
-### 5. Webhook com Payload Inesperado
+### 5. Webhook with Unexpected Payload
 
-**Simular**: Envie webhook com `type: "merchant_order"` ou sem `data.id`
+**Simulate**: Send webhook with `type: "merchant_order"` or without `data.id`
 
-**Resultado**:
+**Result**:
 
-- Controller sempre retorna `200 OK`
-- Logs: `MP_WEBHOOK_IGNORED` ou `MP_WEBHOOK_NO_ID`
-- Mercado Pago não retenta
-
----
-
-## 📊 Observabilidade
-
-### Códigos de Log Estruturados
-
-| Código                  | Descrição                          |
-| ----------------------- | ---------------------------------- |
-| `CREATE_PAYMENT_START`  | Início da criação de pagamento     |
-| `WORKFLOW_STARTED`      | Workflow Temporal iniciado         |
-| `MP_PREFERENCE_CREATED` | Preference criada no Mercado Pago  |
-| `SIGNAL_RECEIVED`       | Webhook sinalizou o workflow       |
-| `SIGNAL_TIMEOUT`        | Timeout aguardando webhook         |
-| `POLLING_SUCCESS`       | Status obtido via polling          |
-| `WORKFLOW_COMPLETED`    | Workflow finalizado (PAID ou FAIL) |
-| `WEBHOOK_DUPLICATE`     | Evento duplicado ignorado          |
-| `WEBHOOK_MP_FETCHED`    | Dados buscados do Mercado Pago     |
-
-### Correlação de Logs
-
-Todos os logs incluem:
-
-- `paymentId`: ID interno do pagamento
-- `workflowId`: ID do workflow Temporal (`payment-{id}`)
-- `mpPaymentId`: ID do pagamento no Mercado Pago
-- `externalReference`: Correlação entre sistemas (= `paymentId`)
+- Controller always returns `200 OK`
+- Logs: `MP_WEBHOOK_IGNORED` or `MP_WEBHOOK_NO_ID`
+- Mercado Pago doesn't retry
 
 ---
 
-## 🛠️ Scripts Úteis
+## Observability
+
+### Structured Log Codes
+
+| Code                    | Description                       |
+| ----------------------- | --------------------------------- |
+| `CREATE_PAYMENT_START`  | Payment creation initiated        |
+| `WORKFLOW_STARTED`      | Temporal workflow started         |
+| `MP_PREFERENCE_CREATED` | Mercado Pago preference created   |
+| `SIGNAL_RECEIVED`       | Webhook signaled the workflow     |
+| `SIGNAL_TIMEOUT`        | Timeout waiting for webhook       |
+| `POLLING_SUCCESS`       | Status obtained via polling       |
+| `WORKFLOW_COMPLETED`    | Workflow completed (PAID or FAIL) |
+| `WEBHOOK_DUPLICATE`     | Duplicate event ignored           |
+| `WEBHOOK_MP_FETCHED`    | Data fetched from Mercado Pago    |
+
+### Log Correlation
+
+All logs include:
+
+- `paymentId`: Internal payment ID
+- `workflowId`: Temporal workflow ID (`payment-{id}`)
+- `mpPaymentId`: Mercado Pago payment ID
+- `externalReference`: Cross-system correlation (= `paymentId`)
+
+---
+
+## Useful Scripts
 
 ```bash
-# Desenvolvimento
-npm run start:dev              # API em modo watch
-npm run temporal:worker        # Worker Temporal standalone
+# Development
+npm run start:dev              # API in watch mode
+npm run temporal:worker        # Standalone Temporal worker
 
-# Testes
-npm run test                   # Todos os testes
-npm run test:unit              # Apenas unitários
-npm run test:e2e:run           # E2E com banco isolado
-npm run lint                   # Verificar padrões
+# Testing
+npm run test                   # All tests
+npm run test:unit              # Unit tests only
+npm run test:e2e:run           # E2E with isolated database
+npm run lint                   # Check code standards
 
 # Docker
-docker-compose up -d           # Subir tudo
-docker-compose logs -f app     # Ver logs da API
-docker-compose logs -f worker  # Ver logs do Worker
-docker-compose down -v         # Parar e limpar volumes
+docker-compose up -d           # Start all services
+docker-compose logs -f app     # View API logs
+docker-compose logs -f worker  # View Worker logs
+docker-compose down -v         # Stop and clean volumes
 
 # Prisma
-npx prisma studio              # Interface visual do banco
-npx prisma migrate dev         # Criar nova migração
-npx prisma generate            # Regenerar cliente
+npx prisma studio              # Visual database interface
+npx prisma migrate dev         # Create new migration
+npx prisma generate            # Regenerate client
 ```
 
 ---
 
-## 🔐 Variáveis de Ambiente
+## Environment Variables
 
-| Variável                                | Descrição                       | Padrão           |
-| --------------------------------------- | ------------------------------- | ---------------- |
-| `PORT`                                  | Porta da API                    | `3000`           |
-| `DATABASE_URL`                          | Connection string PostgreSQL    | -                |
-| `MERCADOPAGO_ACCESS_TOKEN`              | Token de acesso MP              | -                |
-| `TEMPORAL_ENABLED`                      | Habilitar Temporal              | `true`           |
-| `TEMPORAL_ADDRESS`                      | Endereço do Temporal Server     | `localhost:7233` |
-| `TEMPORAL_TASK_QUEUE`                   | Fila de tasks                   | `payments-queue` |
-| `TEMPORAL_MOCK_MP`                      | Mockar Mercado Pago no Temporal | `false`          |
-| `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES` | Timeout do signal               | `10`             |
-
----
-
-## ✅ Checklist de Validação (Avaliador)
-
-Antes de aprovar, execute:
-
-- [ ] `docker-compose up -d --build` - Tudo sobe sem erros
-- [ ] `curl http://localhost:3000/health` - Retorna `200 OK`
-- [ ] `curl http://localhost:8080` - Temporal UI acessível
-- [ ] `npm run test:unit` - Todos os testes passam
-- [ ] `npm run test:e2e:run` - E2E passa
-- [ ] Criar pagamento PIX - Status `PENDING`
-- [ ] Criar pagamento CREDIT_CARD - Retorna `mpInitPoint`
-- [ ] Verificar workflow no Temporal UI - Status `Running`
-- [ ] Simular webhook aprovado - Payment vai para `PAID`
-- [ ] Workflow no Temporal UI - Status `Completed`
-- [ ] Simular erro (token inválido) - Payment vai para `FAIL` com `failReason`
-- [ ] Webhook duplicado - Retorna `200` e ignora
-- [ ] `npm run lint` - Sem erros
+| Variable                                | Description                   | Default          |
+| --------------------------------------- | ----------------------------- | ---------------- |
+| `PORT`                                  | API port                      | `3000`           |
+| `DATABASE_URL`                          | PostgreSQL connection string  | -                |
+| `MERCADOPAGO_ACCESS_TOKEN`              | Mercado Pago access token     | -                |
+| `TEMPORAL_ENABLED`                      | Enable Temporal               | `true`           |
+| `TEMPORAL_ADDRESS`                      | Temporal Server address       | `localhost:7233` |
+| `TEMPORAL_TASK_QUEUE`                   | Task queue name               | `payments-queue` |
+| `TEMPORAL_MOCK_MP`                      | Mock Mercado Pago in Temporal | `false`          |
+| `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES` | Signal timeout                | `10`             |
 
 ---
 
-## 🎯 Decisões Técnicas
+## Technical Decisions
 
-### Por que Temporal.io?
+### Why Temporal.io?
 
-- **Resiliência**: Retries automáticos, timeouts configuráveis
-- **Observabilidade**: UI nativa para debug de workflows
-- **Determinismo**: Garantia de execução consistente
-- **Escalabilidade**: Workers horizontalmente escaláveis
+- **Resilience**: Automatic retries, configurable timeouts
+- **Observability**: Native UI for workflow debugging
+- **Determinism**: Guaranteed consistent execution
+- **Scalability**: Horizontally scalable workers
 
-### Por que payment.id como externalReference?
+### Why payment.id as externalReference?
 
-- **Simplicidade**: Evita gerar UUIDs adicionais
-- **Rastreabilidade**: Correlação direta entre sistemas
-- **Idempotência**: Chave única para deduplicação
+- **Simplicity**: Avoids generating additional UUIDs
+- **Traceability**: Direct correlation between systems
+- **Idempotency**: Unique key for deduplication
 
-### Por que Webhook sempre retorna 200?
+### Why Webhook Always Returns 200?
 
-- **Resiliência**: Evita retentativas desnecessárias do Mercado Pago
-- **Idempotência**: Sistema lida internamente com duplicatas
-- **Logs**: Erros são registrados sem quebrar o contrato
+- **Resilience**: Avoids unnecessary retries from Mercado Pago
+- **Idempotency**: System handles duplicates internally
+- **Logging**: Errors are logged without breaking the contract
 
 ---
 
-## 📝 Assunções e Trade-offs
+## Assumptions and Trade-offs
 
-### Assunções
+### Assumptions
 
-- Mercado Pago envia webhooks confiáveis (eventual consistency)
-- Temporal Server está sempre disponível (ou usa fallback)
-- PostgreSQL é a única fonte de verdade
+- Mercado Pago sends reliable webhooks (eventual consistency)
+- Temporal Server is always available (or uses fallback)
+- PostgreSQL is the single source of truth
 
 ### Trade-offs
 
-- **Polling Fallback**: Adiciona latência mas garante finalização
-- **Workflow Timeout**: 10 minutos padrão (ajustável por env)
-- **Mock no Temporal**: Facilita testes mas requer flag explícita
+- **Polling Fallback**: Adds latency but ensures completion
+- **Workflow Timeout**: 10 minutes default (configurable via env)
+- **Mock in Temporal**: Facilitates testing but requires explicit flag
 
 ---
 
-**Desenvolvido com foco em qualidade, resiliência e experiência do avaliador.** 🚀
+**Built with focus on quality, resilience, and production readiness.** 🚀

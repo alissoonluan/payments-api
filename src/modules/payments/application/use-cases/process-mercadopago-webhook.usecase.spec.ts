@@ -17,7 +17,7 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
   beforeEach(() => {
     repository = {
       findByExternalReference: jest.fn(),
-      updateStatus: jest.fn(),
+      update: jest.fn(),
     } as unknown as jest.Mocked<PaymentsRepository>;
 
     gateway = {
@@ -66,10 +66,11 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
     expect(repository.findByExternalReference).toHaveBeenCalledWith(
       'ext-ref-123',
     );
-    expect(repository.updateStatus).toHaveBeenCalledWith(
-      '1',
-      PaymentStatus.PAID,
-    );
+    expect(repository.update).toHaveBeenCalledWith('1', {
+      status: PaymentStatus.PAID,
+      mpPaymentId: 'mp-123',
+      failReason: undefined,
+    });
     expect(result).toEqual({
       ok: true,
       updated: true,
@@ -86,10 +87,11 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
 
     const result = await useCase.execute('mp-123');
 
-    expect(repository.updateStatus).toHaveBeenCalledWith(
-      '1',
-      PaymentStatus.FAIL,
-    );
+    expect(repository.update).toHaveBeenCalledWith('1', {
+      status: PaymentStatus.FAIL,
+      mpPaymentId: 'mp-123',
+      failReason: 'mp_status_rejected',
+    });
     expect(result.status).toBe(PaymentStatus.FAIL);
     expect(result.updated).toBe(true);
   });
@@ -115,7 +117,7 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
       PaymentStatus.PAID,
       'mp-999',
     );
-    expect(repository.updateStatus).not.toHaveBeenCalled();
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it('should throw NotFoundException if payment is not found', async () => {

@@ -27,7 +27,6 @@ describe('PaymentActivities', () => {
   beforeEach(() => {
     repository = {
       findById: jest.fn(),
-      updateStatus: jest.fn(),
       update: jest.fn(),
     } as any;
 
@@ -68,12 +67,12 @@ describe('PaymentActivities', () => {
   });
 
   describe('updatePaymentStatus', () => {
-    it('should call repository updateStatus', async () => {
+    it('should call repository update', async () => {
       await activities.updatePaymentStatus('1', PaymentStatus.PAID);
-      expect(repository.updateStatus).toHaveBeenCalledWith(
-        '1',
-        PaymentStatus.PAID,
-      );
+      expect(repository.update).toHaveBeenCalledWith('1', {
+        status: PaymentStatus.PAID,
+        failReason: undefined,
+      });
     });
   });
 });

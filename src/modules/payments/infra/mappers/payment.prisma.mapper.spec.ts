@@ -15,8 +15,10 @@ describe('PaymentPrismaMapper', () => {
         status: 'PENDING',
         mpExternalReference: 'ref-123',
         mpPreferenceId: 'pref-123',
+        mpPaymentId: null,
         mpInitPoint: 'http://init',
         mpSandboxInitPoint: 'http://sandbox',
+        failReason: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -40,8 +42,10 @@ describe('PaymentPrismaMapper', () => {
         status: 'PAID',
         mpExternalReference: null,
         mpPreferenceId: null,
+        mpPaymentId: null,
         mpInitPoint: null,
         mpSandboxInitPoint: null,
+        failReason: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
