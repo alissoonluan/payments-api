@@ -11,6 +11,7 @@ describe('FakePaymentGateway', () => {
 
   it('should create a preference with deterministic values', async () => {
     const payment = new PaymentEntity({
+      id: 'test-id',
       amount: 100,
       description: 'Test',
       payerCpf: '12345678909',
@@ -21,9 +22,9 @@ describe('FakePaymentGateway', () => {
     const result = await gateway.createPreference(payment);
 
     expect(result).toEqual({
-      preferenceId: 'test_preference_id',
-      initPoint: 'http://test.init.point',
-      sandboxInitPoint: 'http://test.sandbox.init.point',
+      preferenceId: 'pref_test-id',
+      initPoint: 'https://fake-mp/init-point/test-id',
+      sandboxInitPoint: 'https://fake-mp/sandbox/test-id',
     });
   });
 

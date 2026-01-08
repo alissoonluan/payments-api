@@ -1,4 +1,5 @@
 import { UnprocessableEntityException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CreatePaymentUseCase } from './create-payment.usecase';
 import { PaymentsRepository } from '../ports/payments.repository';
 import { PaymentGateway } from '../ports/payment-gateway';
@@ -16,6 +17,7 @@ describe('CreatePaymentUseCase', () => {
   let gateway: jest.Mocked<PaymentGateway>;
   let logger: jest.Mocked<AppLoggerService>;
   let paymentWorkflowPort: jest.Mocked<PaymentWorkflowPort>;
+  let configService: jest.Mocked<ConfigService>;
 
   beforeEach(() => {
     repository = {
@@ -40,11 +42,19 @@ describe('CreatePaymentUseCase', () => {
       signalPaymentResult: jest.fn().mockResolvedValue(undefined),
     };
 
+    configService = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'TEMPORAL_ENABLED') return true;
+        return undefined;
+      }),
+    } as any;
+
     useCase = new CreatePaymentUseCase(
       repository,
       gateway,
       logger,
       paymentWorkflowPort,
+      configService,
     );
   });
 

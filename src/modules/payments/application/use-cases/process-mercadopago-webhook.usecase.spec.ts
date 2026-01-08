@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PaymentEntity } from '../../domain/payment.entity';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { PaymentGateway } from '../ports/payment-gateway';
@@ -13,6 +14,7 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
   let gateway: jest.Mocked<PaymentGateway>;
   let logger: jest.Mocked<AppLoggerService>;
   let paymentWorkflowPort: jest.Mocked<PaymentWorkflowPort>;
+  let configService: jest.Mocked<ConfigService>;
 
   beforeEach(() => {
     repository = {
@@ -35,11 +37,19 @@ describe('ProcessMercadoPagoWebhookUseCase', () => {
       signalPaymentResult: jest.fn().mockResolvedValue(undefined),
     };
 
+    configService = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'TEMPORAL_ENABLED') return true;
+        return undefined;
+      }),
+    } as any;
+
     useCase = new ProcessMercadoPagoWebhookUseCase(
       repository,
       gateway,
       logger,
       paymentWorkflowPort,
+      configService,
     );
   });
 
