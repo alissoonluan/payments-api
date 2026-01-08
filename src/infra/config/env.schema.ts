@@ -10,7 +10,6 @@ export const envSchema = Joi.object({
   POSTGRES_PASSWORD: Joi.string().required(),
   POSTGRES_DB: Joi.string().required(),
   MERCADOPAGO_ACCESS_TOKEN: Joi.string().required(),
-  MERCADOPAGO_WEBHOOK_SECRET: Joi.string().required(),
   MERCADOPAGO_NOTIFICATION_URL: Joi.string().required(),
   MERCADOPAGO_BASE_URL: Joi.string().required(),
   MERCADOPAGO_SUCCESS_URL: Joi.string().required(),

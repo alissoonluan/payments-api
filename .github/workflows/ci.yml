@@ -29,7 +29,6 @@ jobs:
       DATABASE_URL: postgresql://admin:admin@localhost:5432/payments_db?schema=public
       MERCADOPAGO_ACCESS_TOKEN: test_token
       MERCADOPAGO_NOTIFICATION_URL: http://notify
-      MERCADOPAGO_WEBHOOK_SECRET: test_secret
       MERCADOPAGO_BASE_URL: http://localhost:3001
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
