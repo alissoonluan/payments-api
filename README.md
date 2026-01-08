@@ -1,251 +1,203 @@
-# Payments API
+# 🏦 Payments API
 
-A production-ready payment orchestration service built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io**.  
-The API handles PIX and credit-card payments, using Temporal to guarantee reliable, long-running workflows for the credit-card flow.
+A robust, enterprise-grade payment orchestration service built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io**.
+
+This project provides a highly resilient orchestrator for financial transactions, focusing specifically on **PIX** and **Credit Card** flows. It leverages **Temporal.io** to manage complex payment lifecycles, ensuring transactions are never lost even during service failures.
 
 ---
 
-## 📦 Prerequisites
+## 🏗️ Architecture Overview
 
-Before starting, make sure you have the following installed:
+The project follows **Clean Architecture** principles, ensuring that the business logic (Domain & Application) is decoupled from infrastructure concerns (API, Database, External Gateways).
 
-- **Node.js** (v18+ recommended)
+### 🔄 System Flow (Credit Card)
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as Payments API
+    participant T as Temporal (Orchestrator)
+    participant MP as Mercado Pago
+    participant DB as PostgreSQL
+
+    U->>API: POST /api/payments (CC)
+    API->>DB: Create Payment (PENDING)
+    API->>T: Start CreditCardWorkflow
+    T->>MP: Create Preference
+    MP-->>T: preferenceId & initPoint
+    T->>DB: Update Payment (mpInitPoint)
+    API-->>U: 201 Created (with initPoint)
+
+    Note over U,MP: User completes payment on MP checkout
+
+    MP->>API: Webhook (payment.approved)
+    API->>DB: Check Idempotency
+    API->>T: Signal Workflow (PAID)
+    T->>DB: Finalize Payment (PAID)
+    T-->>T: Workflow Completed
+```
+
+---
+
+## 🚀 Getting Started
+
+### 📋 Prerequisites
+
+- **Node.js** (v18+)
 - **Docker & Docker Compose**
-- **npm**
-- **Git**
+- **npm** (v9+)
+
+### 🛠️ Installation & Setup
+
+1. **Clone & Install**
+
+   ```bash
+   git clone <repository-url>
+   cd payments-api
+   npm install
+   ```
+
+2. **Configuration**
+   Copy the environment template:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Exposing for Webhooks (Required for real MP testing)**
+   Mercado Pago needs to reach your local environment to send webhook notifications.
+
+   ```bash
+   # Using ngrok
+   ngrok http 3000
+   ```
+
+   Update your `.env` with the generated ngrok URL:
+
+   ```env
+   # Webhook Notification (The most important for background updates)
+   MERCADOPAGO_NOTIFICATION_URL=https://your-id.ngrok-free.app/api/webhooks/mercadopago
+
+   # Checkout Redirects (Mandatory for Credit Card flow)
+   MERCADOPAGO_SUCCESS_URL=https://your-id.ngrok-free.app/payments/success
+   MERCADOPAGO_FAILURE_URL=https://your-id.ngrok-free.app/payments/failure
+   MERCADOPAGO_PENDING_URL=https://your-id.ngrok-free.app/payments/pending
+   ```
+
+   _Note: These URLs are required by the Mercado Pago API to redirect the user after the payment attempt and to send asynchronous notifications._
 
 ---
 
-## ⚙️ Project Setup
+## 🛰️ Running the Project
 
-### 1. Clone the repository
+### Option A: The "One Command" Start (Docker)
 
-```bash
-git clone <repository-url>
-cd payments-api
-```
-
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
-### 3. Environment configuration
-
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-> ⚠️ **Important – Public URLs required**  
-> Mercado Pago requires **public URLs** not only for webhooks, but also for **redirect URLs** used after the checkout flow.
-
-You **must expose your API publicly** (e.g. using `ngrok`) and configure **all URLs below**.
-
-Example:
-
-```bash
-ngrok http 3000
-```
-
-Example `.env` configuration:
-
-```env
-# Webhook
-MERCADOPAGO_NOTIFICATION_URL=https://<your-ngrok-subdomain>.ngrok.app/api/webhooks/mercadopago
-
-# Checkout redirects
-MERCADOPAGO_SUCCESS_URL=https://<your-ngrok-subdomain>.ngrok.app/payments/success
-MERCADOPAGO_FAILURE_URL=https://<your-ngrok-subdomain>.ngrok.app/payments/failure
-MERCADOPAGO_PENDING_URL=https://<your-ngrok-subdomain>.ngrok.app/payments/pending
-```
-
-> ℹ️ These redirect URLs are returned inside the Mercado Pago preference and are mandatory for
-> **credit-card checkout flows**, even in sandbox mode.
-
----
-
-## 🏗️ Architecture & Philosophy
-
-This project follows **Clean Architecture**, keeping business logic isolated from infrastructure concerns.
-
-- **Resilience**: Credit-card payments are orchestrated by Temporal workflows.
-- **Idempotency**: Webhook handling prevents duplicate processing.
-- **Observability**: Workflow states are visible via Temporal UI with structured logs.
-
----
-
-## 🚀 Execution Modes
-
-### A) Full Stack Mode (Recommended)
+This starts the API, PostgreSQL, Temporal Server, and the Temporal Worker.
 
 ```bash
 docker compose up -d --build
 ```
 
-**Services started:**
+- **API**: `http://localhost:3000`
+- **Swagger Docs**: `http://localhost:3000/api/docs`
+- **Temporal UI**: `http://localhost:8080` (Monitor your workflows here!)
 
-- NestJS API (port 3000)
-- Temporal Worker
-- Temporal Server + UI (port 8080)
-- PostgreSQL (application + Temporal)
-
----
-
-### B) Local Development Mode
+### Option B: Local Development
 
 ```bash
+# Terminal 1: Application
 npm run start:dev
+
+# Terminal 2: Temporal Worker
 npm run temporal:worker
 ```
 
-> ⚠️ Credit-card payments require the Temporal Worker running.
-
 ---
 
-## 🧪 Verification Guide
+## 🧪 Testing Suite
 
-### Automatic Tests
+The project maintains high reliability through a comprehensive test suite.
+
+### 🧪 Unit Tests
+
+Focuses on business rules and use cases.
 
 ```bash
 npm run test:unit
+```
+
+### 🧪 E2E Tests (Integration)
+
+Validates the full API + DB flow. **Note**: These tests run deterministically without needing a real Temporal server running by using an internal fallback flag (`TEMPORAL_ENABLED=false`).
+
+```bash
 npm run test:e2e:run
 ```
 
 ---
 
-### Manual End-to-End Flow
+## 🕹️ Manual Testing Guide (E2E)
 
-#### 1. Create a payment
+### 1. Create a Credit Card Payment
 
 ```bash
 curl -X POST http://localhost:3000/api/payments \
   -H "Content-Type: application/json" \
   -d '{
-    "amount": 199.90,
-    "description": "Premium Subscription",
+    "amount": 250.00,
+    "description": "Premium License",
     "payerCpf": "11144477735",
     "paymentMethod": "CREDIT_CARD"
   }'
 ```
 
-Save the returned `id`.
+_Take note of the `id` and `mpExternalReference` returned._
 
----
+### 2. Monitor the Orchestration
 
-#### 2. Observe workflow
+Visite the **Temporal UI** (`http://localhost:8080`). You will see a workflow named `payment-<externalReference>` in `Running` state. It is currently waiting for the payment signal.
 
-Open Temporal UI:
-
-```
-http://localhost:8080
-```
-
-Workflow name:
-
-```
-payment-<id>
-```
-
-Status should be **Running**.
-
----
-
-#### 3. Simulate webhook
+### 3. Simulate Mercado Pago Webhook
 
 ```bash
 curl -X POST http://localhost:3000/api/webhooks/mercadopago \
   -H "Content-Type: application/json" \
   -d '{
     "type": "payment",
-    "data": { "id": "mp-test-demo-123" }
+    "data": { "id": "real-mp-id-001" }
   }'
 ```
 
----
-
-#### 4. Validate final state
+### 4. Verify Final State
 
 ```bash
 curl http://localhost:3000/api/payments/<id>
 ```
 
-Expected response:
-
-```json
-{
-  "status": "PAID"
-}
-```
-
-Workflow should be **Completed** in Temporal UI.
+_Expected Status: `PAID`._
 
 ---
 
-## 🛠️ Scripts Reference
+## 🛡️ Key Features & Implementation Details
 
-| Script                              | Purpose                                  |
-|------------------------------------|------------------------------------------|
-| `npm run build`                    | Build project                             |
-| `npm run lint`                     | Lint code                                |
-| `npm run temporal:worker`          | Start Temporal Worker                    |
-| `npm run temporal:check-workflows` | Validate workflow determinism             |
-| `npm run test:unit`                | Run unit tests                           |
-| `npm run test:e2e:run`             | Run full E2E tests                       |
-| `npx prisma studio`                | Visualize database                       |
+- **Clean Architecture**: Boundaries enforced between layers.
+- **Temporal.io Orchestration**: Ensures that even if the server crashes after a payment is authorized on the gateway, the system will eventually catch up and update the database.
+- **Idempotent Webhooks**: We use a `WebhookEvent` table to ensure that re-sent notifications from Mercado Pago do not trigger duplicate business logic.
+- **Swagger Documentation**: Self-documenting API available at `/api/docs`.
+- **Workflow Determinism**: Automated checks to ensure workflows comply with Temporal's execution constraints (`npm run temporal:check-workflows`).
 
 ---
 
-## 🛡️ Workflow Safety
+## 📜 Scripts Reference
 
-Temporal workflows **must be deterministic**.
-
-### Rules
-
-- No Node.js globals (`process`, `Date.now`, etc.)
-- No forbidden aliases (`@modules`, `@shared`)
-
-### Validation
-
-```bash
-npm run temporal:check-workflows
-```
+| Script                    | Action                                        |
+| ------------------------- | --------------------------------------------- |
+| `npm run start:dev`       | Start API in watch mode                       |
+| `npm run temporal:worker` | Start the background job processor            |
+| `npm run test:e2e:run`    | Spin up test DB, run migrations and E2E tests |
+| `npm run prisma:generate` | Update Prisma Client types                    |
+| `npm run build`           | Production build                              |
 
 ---
 
-## 🌱 Environment Variables
-
-| Variable                                | Description                         | Default |
-|----------------------------------------|-------------------------------------|---------|
-| `MERCADOPAGO_ACCESS_TOKEN`             | Mercado Pago token                  | –       |
-| `MERCADOPAGO_NOTIFICATION_URL`         | Webhook public URL                  | –       |
-| `MERCADOPAGO_SUCCESS_URL`              | Success redirect URL                | –       |
-| `MERCADOPAGO_FAILURE_URL`              | Failure redirect URL                | –       |
-| `MERCADOPAGO_PENDING_URL`              | Pending redirect URL                | –       |
-| `TEMPORAL_ENABLED`                     | Enable Temporal                     | `true`  |
-| `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES`| Webhook timeout                     | `10`    |
-| `TEMPORAL_MOCK_MP`                     | Mock Mercado Pago                   | `false` |
-
----
-
-## ⚠️ Troubleshooting
-
-- Worker stuck:
-```bash
-docker logs -f payments_worker
-```
-
-- After Prisma changes:
-```bash
-npx prisma generate
-```
-
-- Temporal connection:
-Ensure port `7233` is open.
-
----
-
-**Payments API**  
-_Built for resilience, observability, and real-world payment orchestration._
+**Payments API** | _Developed for Senior-level Technical Evaluation_

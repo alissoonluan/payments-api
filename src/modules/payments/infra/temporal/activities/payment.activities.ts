@@ -161,7 +161,6 @@ export class PaymentActivities {
     try {
       await this.paymentsRepository.update(paymentId, data);
     } catch (error: any) {
-      // ✅ if Prisma throws P2025 (record not found), swallow and mark non-retryable
       const msg = String(error?.message || '');
       const code = String(error?.code || '');
 

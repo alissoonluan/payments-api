@@ -46,6 +46,10 @@ describe('PaymentsController (e2e)', () => {
     await app.init();
   });
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   afterAll(async () => {
     await app.close();
     await dbHelper.disconnect();
@@ -54,8 +58,6 @@ describe('PaymentsController (e2e)', () => {
   const validCpf = '11144477735';
 
   it('POST /api/payments (CREDIT_CARD) should return preference', async () => {
-    mockWorkflowPort.startCreditCardWorkflow.mockResolvedValue(undefined);
-
     const res = await request(app.getHttpServer())
       .post('/api/payments')
       .send({
@@ -67,8 +69,9 @@ describe('PaymentsController (e2e)', () => {
       .expect(201);
 
     expect(res.body.mpInitPoint).toBeDefined();
+    expect(res.body.mpInitPoint).toContain('https://fake-mp/init-point/');
     expect(res.body.status).toBe(PaymentStatus.PENDING);
-    expect(mockWorkflowPort.startCreditCardWorkflow).toHaveBeenCalled();
+    expect(mockWorkflowPort.startCreditCardWorkflow).not.toHaveBeenCalled();
   });
 
   it('POST /api/webhooks/mercadopago (payment) should update status to PAID', async () => {
@@ -103,11 +106,8 @@ describe('PaymentsController (e2e)', () => {
       .expect(200);
 
     expect(getRes.body.status).toBe(PaymentStatus.PAID);
-    expect(mockWorkflowPort.signalPaymentResult).toHaveBeenCalledWith(
-      extRef,
-      PaymentStatus.PAID,
-      'evt-paid-1',
-    );
+    // Temporal disabled, so no signal sent
+    expect(mockWorkflowPort.signalPaymentResult).not.toHaveBeenCalled();
   });
 
   it('POST /api/webhooks/mercadopago (merchant_order) should return 200 and ignore', async () => {

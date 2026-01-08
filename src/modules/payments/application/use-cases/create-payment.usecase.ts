@@ -1,4 +1,5 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CreatePaymentDto } from '../dtos/create-payment.dto';
 import { PaymentResponseDto } from '../dtos/payment-response.dto';
 import { PaymentsRepository } from '../ports/payments.repository';
@@ -16,6 +17,7 @@ export class CreatePaymentUseCase {
     private readonly paymentGateway: PaymentGateway,
     private readonly logger: AppLoggerService,
     private readonly paymentWorkflowPort: PaymentWorkflowPort,
+    private readonly configService: ConfigService,
   ) {}
 
   async execute(dto: CreatePaymentDto): Promise<PaymentResponseDto> {
@@ -66,38 +68,63 @@ export class CreatePaymentUseCase {
 
     const updatedPayment = await this.paymentsRepository.findById(payment.id);
 
-    this.logger.logInfo(
-      'CREATE_PAYMENT_WORKFLOW_START',
-      'Starting Temporal workflow for CREDIT_CARD payment',
-      {
-        paymentId: updatedPayment!.id,
-        externalReference: updatedPayment!.mpExternalReference,
-      },
-    );
+    const isTemporalEnabled =
+      this.configService.get<boolean>('TEMPORAL_ENABLED') !== false;
 
-    await this.paymentWorkflowPort.startCreditCardWorkflow(
-      updatedPayment!.id,
-      updatedPayment!.mpExternalReference!,
-    );
+    if (isTemporalEnabled) {
+      this.logger.logInfo(
+        'CREATE_PAYMENT_WORKFLOW_START',
+        'Starting Temporal workflow for CREDIT_CARD payment',
+        {
+          paymentId: updatedPayment!.id,
+          externalReference: updatedPayment!.mpExternalReference,
+        },
+      );
 
-    let finalPayment = updatedPayment!;
-    const startTime = Date.now();
-    while (!finalPayment.mpInitPoint && Date.now() - startTime < 5000) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const found = await this.paymentsRepository.findById(payment.id);
-      if (found) finalPayment = found;
+      await this.paymentWorkflowPort.startCreditCardWorkflow(
+        updatedPayment!.id,
+        updatedPayment!.mpExternalReference!,
+      );
+
+      let finalPayment = updatedPayment!;
+      const startTime = Date.now();
+      while (!finalPayment.mpInitPoint && Date.now() - startTime < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const found = await this.paymentsRepository.findById(payment.id);
+        if (found) finalPayment = found;
+      }
+
+      this.logger.logInfo(
+        'CREATE_PAYMENT_SUCCESS',
+        'CREDIT_CARD payment created and workflow started',
+        {
+          paymentId: finalPayment.id,
+          status: finalPayment.status,
+          hasInitPoint: !!finalPayment.mpInitPoint,
+        },
+      );
+
+      return PaymentResponseDto.fromEntity(finalPayment);
     }
 
     this.logger.logInfo(
-      'CREATE_PAYMENT_SUCCESS',
-      'CREDIT_CARD payment created and workflow started',
-      {
-        paymentId: finalPayment.id,
-        status: finalPayment.status,
-        hasInitPoint: !!finalPayment.mpInitPoint,
-      },
+      'CREATE_PAYMENT_NO_TEMPORAL',
+      'Temporal disabled, creating preference directly',
+      { paymentId: updatedPayment!.id },
     );
 
-    return PaymentResponseDto.fromEntity(finalPayment);
+    const pref = await this.paymentGateway.createPreference(updatedPayment!);
+
+    await this.paymentsRepository.update(updatedPayment!.id, {
+      mpPreferenceId: pref.preferenceId,
+      mpInitPoint: pref.initPoint,
+      mpSandboxInitPoint: pref.sandboxInitPoint,
+    });
+
+    const finalPayment = await this.paymentsRepository.findById(
+      updatedPayment!.id,
+    );
+
+    return PaymentResponseDto.fromEntity(finalPayment!);
   }
 }

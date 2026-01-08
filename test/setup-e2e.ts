@@ -16,5 +16,4 @@ const safeUrl = process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@');
 console.log('✓ E2E test environment verified');
 console.log(`✓ DATABASE_URL: ${safeUrl}`);
 
-// Increase timeout for E2E tests
 jest.setTimeout(30000);

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PaymentMethod, PaymentStatus } from '../../domain/payment.enums';
 import { PaymentGateway } from '../ports/payment-gateway';
 import { PaymentsRepository } from '../ports/payments.repository';
@@ -18,6 +19,7 @@ export class ProcessMercadoPagoWebhookUseCase {
     private readonly paymentGateway: PaymentGateway,
     private readonly logger: AppLoggerService,
     private readonly paymentWorkflowPort: PaymentWorkflowPort,
+    private readonly configService: ConfigService,
   ) {}
 
   async execute(mpPaymentId: string): Promise<ProcessMercadoPagoWebhookResult> {
@@ -74,8 +76,13 @@ export class ProcessMercadoPagoWebhookUseCase {
     }
 
     const newStatus = this.mapStatus(mpPayment.status);
+    const isTemporalEnabled =
+      this.configService.get<boolean>('TEMPORAL_ENABLED') !== false;
 
-    if (payment.paymentMethod === PaymentMethod.CREDIT_CARD) {
+    if (
+      payment.paymentMethod === PaymentMethod.CREDIT_CARD &&
+      isTemporalEnabled
+    ) {
       try {
         await this.paymentWorkflowPort.signalPaymentResult(
           payment.mpExternalReference!,

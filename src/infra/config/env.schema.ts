@@ -15,4 +15,5 @@ export const envSchema = Joi.object({
   MERCADOPAGO_SUCCESS_URL: Joi.string().required(),
   MERCADOPAGO_FAILURE_URL: Joi.string().required(),
   MERCADOPAGO_PENDING_URL: Joi.string().required(),
+  TEMPORAL_ENABLED: Joi.boolean().default(true),
 });

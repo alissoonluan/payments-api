@@ -5,11 +5,12 @@ import {
 } from '../../application/ports/payment-gateway';
 
 export class FakePaymentGateway implements PaymentGateway {
-  createPreference(_payment: PaymentEntity): Promise<CreatePreferenceResult> {
+  createPreference(payment: PaymentEntity): Promise<CreatePreferenceResult> {
+    const extRef = payment.mpExternalReference || payment.id;
     return Promise.resolve({
-      preferenceId: 'test_preference_id',
-      initPoint: 'http://test.init.point',
-      sandboxInitPoint: 'http://test.sandbox.init.point',
+      preferenceId: `pref_${extRef}`,
+      initPoint: `https://fake-mp/init-point/${extRef}`,
+      sandboxInitPoint: `https://fake-mp/sandbox/${extRef}`,
     });
   }
 
