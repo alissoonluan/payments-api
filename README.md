@@ -1,103 +1,73 @@
 # 🏦 Payments API
 
-A production-ready **payment orchestration service** built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io**.
+A robust, production-ready **payment orchestration service** built with **NestJS**, **PostgreSQL**, **Mercado Pago**, and **Temporal.io**.
 
-This API is responsible for managing **PIX** and **Credit Card** payment lifecycles with strong guarantees of **consistency**, **idempotency**, and **resilience**.  
-Long-running payment processes are orchestrated using **Temporal.io**, ensuring that no transaction is lost even in the presence of failures, retries, or service restarts.
+This API orchestrates **PIX** and **Credit Card** payment lifecycles with strong guarantees around **resilience**, **idempotency**, and **eventual consistency**.  
+Long-running payment processes are coordinated using **Temporal.io**, ensuring payments are not lost even in the presence of retries, webhook duplication, and service restarts.
 
 ---
 
-## 🎯 Problem This Project Solves
+## 🎯 What This Solves
 
-Payment systems operate in an unreliable environment:
+Payments happen in an unreliable environment:
 
-- External gateways may be slow or unavailable
+- Gateways can be slow / fail intermittently
 - Webhooks can be delayed, duplicated, or arrive out of order
-- Services may crash mid-transaction
-- User flows span minutes or hours, not milliseconds
+- A payment may complete minutes after the initial request
+- Services can crash mid-flow
 
-This project addresses these challenges by combining:
+This project addresses those issues by combining:
 
-- Explicit business use cases
-- Infrastructure-agnostic domain logic
-- Deterministic orchestration with Temporal
-- Strict webhook idempotency
-
----
-
-## 🧱 Architectural Design
-
-This project adopts a **Clean, Modular, Use-Case-Driven Architecture**, inspired by:
-
-- Clean Architecture
-- Ports & Adapters (Hexagonal Architecture)
-- Explicit Application Use Cases
-- Eventual Consistency with Workflow Orchestration
-
-The architecture is expressed **directly through the folder structure**, not only by documentation.
+- **Use-case driven application layer** (explicit business actions)
+- **Ports & adapters** (infrastructure can change without rewriting business rules)
+- **Temporal orchestration** (durable long-running coordination)
+- **Webhook idempotency** (safe retries without double-processing)
 
 ---
 
-## 📦 Module Structure
+## 🧱 Architecture (Applied, Not Buzzwords)
 
-All business logic related to payments lives under:
+This repository uses a **Clean, Modular, Use-Case-Driven** structure. The architecture is reflected by the folder layout, so boundaries are clear and enforceable.
 
-```
+### 📦 Folder Layout (Payments Module)
+
+All payment business logic is contained under:
+
+```text
 src/modules/payments
 ```
 
-Each subfolder has a **single, clear responsibility**.
-
----
-
-### 🟦 domain/ — Business Rules
-
-- Pure business concepts
-- No framework, database, or HTTP dependencies
+#### `domain/` — business rules
+- Entities, value objects, enums
+- No NestJS, no Prisma, no HTTP, no SDK imports
 - Represents the ubiquitous language of the payment domain
 
----
+#### `application/` — what the system does
+- **Use cases** (one file = one business capability)
+- **Ports** (interfaces/contracts for repositories, gateways, orchestration)
 
-### 🟨 application/ — Application Use Cases
+> This layer must not depend on database, HTTP controllers, or Mercado Pago SDK specifics.
 
-Defines what the system does.
+#### `infra/` — how the system does it
+- Prisma repositories and persistence mapping
+- Mercado Pago gateway adapter
+- Anything technical that can change without touching use cases
 
-- One use case per business action
-- Fully isolated from infrastructure
-- Unit-test friendly
+#### `presentation/` — API boundary
+- Controllers, DTOs, request/response mapping, validation
+- No business rules here (only orchestration of inputs/outputs)
 
----
+### ⏱ Temporal Integration
 
-### 🟥 infra/ — Infrastructure Adapters
+Temporal is treated as an **orchestration layer**, not a place for business rules.
 
-Contains technical implementations:
-
-- Prisma repositories
-- Mercado Pago gateway
-- Persistence mappers
-
-Can be replaced without impacting business rules.
-
----
-
-### 🟪 presentation/ — API Layer
-
-- HTTP controllers
-- DTO validation
-- Request/response mapping
-- No business logic
+- **Workflows** coordinate long-running payment states
+- **Activities** delegate execution to application use cases / ports
+- Workflows remain deterministic and replay-safe
 
 ---
 
-### ⏱ temporal/ — Workflow Orchestration
-
-- Long-running processes
-- Deterministic workflows
-- Activities delegate to application use cases
-
----
-
-### 🔄 System Flow (Credit Card)
+## 🔄 System Flow (Credit Card)
 
 ```mermaid
 sequenceDiagram
@@ -152,6 +122,7 @@ sequenceDiagram
    ```
 
 3. **Exposing for Webhooks (Required for real MP testing)**
+
    Mercado Pago needs to reach your local environment to send webhook notifications.
 
    ```bash
@@ -165,7 +136,7 @@ sequenceDiagram
    # Mercado Pago Credentials
    MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-token-here
 
-   # Webhook Notification (The most important for background updates)
+   # Webhook Notification (Required for background updates)
    MERCADOPAGO_NOTIFICATION_URL=https://your-id.ngrok-free.app/api/webhooks/mercadopago
 
    # Checkout Redirects (Mandatory for Credit Card flow)
@@ -174,7 +145,9 @@ sequenceDiagram
    MERCADOPAGO_PENDING_URL=https://your-id.ngrok-free.app/payments/pending
    ```
 
-   _Note: These URLs are required by the Mercado Pago API to redirect the user after the payment attempt and to send asynchronous notifications._
+   **Important:**
+   - `MERCADOPAGO_NOTIFICATION_URL` must be reachable by Mercado Pago, otherwise status updates won’t arrive.
+   - The `SUCCESS/FAILURE/PENDING` URLs are required by Mercado Pago for checkout redirects.
 
 ---
 
@@ -190,7 +163,7 @@ docker compose up -d --build
 
 - **API**: `http://localhost:3000`
 - **Swagger Docs**: `http://localhost:3000/api/docs`
-- **Temporal UI**: `http://localhost:8080` (Monitor your workflows here!)
+- **Temporal UI**: `http://localhost:8080` (Monitor workflows here)
 
 ### Option B: Local Development
 
@@ -206,11 +179,11 @@ npm run temporal:worker
 
 ## 🧪 Testing Suite
 
-The project maintains high reliability through a comprehensive test suite.
+The project maintains reliability through a comprehensive test suite.
 
 ### 🧪 Unit Tests
 
-Focuses on business rules and use cases.
+Focus on business rules and use cases.
 
 ```bash
 npm run test:unit
@@ -218,7 +191,11 @@ npm run test:unit
 
 ### 🧪 E2E Tests (Integration)
 
-Validates the full API + DB flow. **Note**: These tests run deterministically without needing a real Temporal server running by using an internal fallback flag (`TEMPORAL_ENABLED=false`).
+Validates the full API + DB flow.
+
+**Note:** these tests run deterministically without requiring a real Temporal server, using an internal fallback flag:
+
+- `TEMPORAL_ENABLED=false`
 
 ```bash
 npm run test:e2e:run
@@ -253,7 +230,8 @@ The previous request returns an `mpSandboxInitPoint` (or `mpInitPoint`).
 
 ### 3. Monitor the Orchestration
 
-Visit the **Temporal UI** (`http://localhost:8080`). You will see a workflow named `payment-<externalReference>` in `Running` state. If you followed the real flow above, you will see it transition to `Completed` automatically after the payment.
+Visit the **Temporal UI** (`http://localhost:8080`). You will see a workflow named `payment-<externalReference>` in `Running` state.  
+If you followed the real flow above, you will see it transition to `Completed` automatically after the payment.
 
 ---
 
@@ -284,11 +262,11 @@ _Expected Status: `PAID`._
 
 ## 🛡️ Key Features & Implementation Details
 
-- **Clean Architecture**: Boundaries enforced between layers.
-- **Temporal.io Orchestration**: Ensures that even if the server crashes after a payment is authorized on the gateway, the system will eventually catch up and update the database.
-- **Idempotent Webhooks**: We use a `WebhookEvent` table to ensure that re-sent notifications from Mercado Pago do not trigger duplicate business logic.
-- **Swagger Documentation**: Self-documenting API available at `/api/docs`.
-- **Workflow Determinism**: Automated checks to ensure workflows comply with Temporal's execution constraints (`npm run temporal:check-workflows`).
+- **Use-case driven design**: business actions live in the application layer (testable in isolation).
+- **Temporal orchestration**: durable coordination for long-running payment lifecycles.
+- **Idempotent webhooks**: a `WebhookEvent` table guarantees safe retry handling.
+- **Swagger docs**: available at `/api/docs`.
+- **Workflow determinism checks**: `npm run temporal:check-workflows`.
 
 ---
 
@@ -305,5 +283,3 @@ _Expected Status: `PAID`._
 ---
 
 **Payments API** | Made with ❤️ by Alisson Luan
-
-
