@@ -82,6 +82,8 @@ _Take note of the `id` in the response._
 **Step 2: Observability**
 Open the [Temporal UI](http://localhost:8080) and find the workflow `payment-<id>`. You will see it in the `Running` state, waiting for a signal or timeout.
 
+_Note: For testing purposes, you should use the `mpSandboxInitPoint` URL found in the API response or database to simulate the checkout without involving real money._
+
 **Step 3: External Event (Webhook)**
 Simulate a successful payment confirmation from Mercado Pago.
 
@@ -133,8 +135,13 @@ Temporal workflows must be **deterministic**. To ensure this, we have a safety c
 | Variable                                | Description                               | Default |
 | --------------------------------------- | ----------------------------------------- | ------- |
 | `MERCADOPAGO_ACCESS_TOKEN`              | Your MP Token (required for preferences)  | –       |
+| `MERCADOPAGO_NOTIFICATION_URL`          | Public URL for webhooks (ngrok/tunnel)    | –       |
+| `MERCADOPAGO_SUCCESS_URL`               | Redirect URL after successful payment     | –       |
+| `MERCADOPAGO_FAILURE_URL`               | Redirect URL after failed payment         | –       |
+| `MERCADOPAGO_PENDING_URL`               | Redirect URL for pending payments         | –       |
 | `TEMPORAL_ENABLED`                      | Toggle for the orchestration engine       | `true`  |
 | `WORKFLOW_CONFIRMATION_TIMEOUT_MINUTES` | Time to wait for a webhook before polling | `10`    |
+| `TEMPORAL_MOCK_MP`                      | Use mock preference for local testing     | `false` |
 
 ---
 
