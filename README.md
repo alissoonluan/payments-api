@@ -68,6 +68,16 @@ Temporal is treated as an **orchestration layer**, not a place for business rule
 
 ---
 
+## 📐 Business Rules
+
+- A payment is created with initial status `PENDING`
+- Only final states are allowed via manual update:
+  - `PAID`
+  - `FAIL`
+- Webhooks are idempotent and cannot transition a finalized payment
+- A payment lifecycle is owned by a single Temporal workflow
+- Manual updates do not bypass idempotency or workflow finalization rules
+
 ## 🔄 System Flow (Credit Card)
 
 ```mermaid
@@ -207,3 +217,4 @@ curl -X PUT http://localhost:3000/api/payments/<id>   -H "Content-Type: applicat
 ---
 
 **Payments API** | Made with ❤️ by Alisson Luan
+
